@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2 Dashboard (Bornsong Fixed)</title>
+    <title>P2 Dashboard (Service Date Added)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
@@ -74,7 +74,7 @@
                 <option value="Choc">Choc (เชียงใหม่)</option>
                 <option value="Bangyai">Bangyai (กรุงเทพฯ)</option>
                 <option value="Sriracha">Sriracha (ชลบุรี)</option>
-                <option value="Ram">Ram (รามอินทรา)</option>
+                <option value="Ram">Ram (รามคำแหง)</option>
                 <option value="Bornsong">Bornsong</option>
             </select>
             <button class="btn btn-primary" onclick="fetchAndProcessData()" id="loadBtn">🔄 โหลดข้อมูล</button>
@@ -159,7 +159,7 @@
                                 <th>เบอร์ติดต่อ</th>
                                 <th>Sale ดูแล</th>
                                 <th>รายการที่สนใจ</th>
-                            </tr>
+                                <th>วันที่เข้าใช้บริการ</th> </tr>
                         </thead>
                         <tbody id="pendingTableBody"></tbody>
                     </table>
@@ -180,7 +180,7 @@
         'Bangyai': '1JU-rhoWIEHH4oSwIWApo8mUC8zQpNcT0Xd-70E_6CNM',
         'Sriracha': '1PdYqXkrrRGIv-6cCgOn8VXE6MpQhMlBGpFw7BbfzFbI',
         'Ram': '1LFoETe4YdPIxxj27bXxNRip9dKJ-sL7bbDv820ExEtk',
-        'Bornsong': '1dlgM7YaQmJQTuiuNdAMb6tjKHllPgIs8MjfgGZnp8jU' // อัปเดต ID สาขา Bornsong แล้ว
+        'Bornsong': '1dlgM7YaQmJQTuiuNdAMb6tjKHllPgIs8MjfgGZnp8jU'
     };
 
     function getVal(row, keyName) {
@@ -345,7 +345,8 @@
                             name: getVal(log, 'ชื่อลูกค้า'),
                             phone: phone,
                             sale: getVal(log, 'Sale') || '-',
-                            interest: getVal(log, 'รายการที่สนใจ') || '-'
+                            interest: getVal(log, 'รายการที่สนใจ') || '-',
+                            serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-' // เพิ่มการดึงข้อมูลวันที่เข้าใช้บริการ
                         });
                     }
                 }
@@ -476,8 +477,8 @@
                 <td>${row.phone}</td>
                 <td>${row.sale}</td>
                 <td style="font-size:12px; color:#666;">${row.interest}</td>
-            </tr>
-        `).join('') : '<tr><td colspan="5" style="text-align:center; padding: 20px; color:#198754;">เยี่ยมมาก! ไม่มีงานค้างติดตาม</td></tr>';
+                <td style="color:#0d6efd;">${row.serviceDate}</td> </tr>
+        `).join('') : '<tr><td colspan="6" style="text-align:center; padding: 20px; color:#198754;">เยี่ยมมาก! ไม่มีงานค้างติดตาม</td></tr>';
     }
 
     function clearFilters() {
