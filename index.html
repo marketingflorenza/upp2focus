@@ -3,60 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2 Dashboard (Service Date Added)</title>
+    <title>P2 Dashboard (Responsive)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
-        body { background-color: #f0f2f5; padding: 20px; color: #1a1a1a; }
-        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
-        .header { background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); color: white; padding: 30px; text-align: center; }
-        .controls-section { padding: 20px; background: #fff; border-bottom: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; }
-        .filter-group { display: flex; align-items: center; gap: 10px; }
-        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        body { background-color: #f0f2f5; padding: 20px; color: #1a1a1a; font-size: 14px; }
         
-        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+        /* Container Adjustment */
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        .header { background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); color: white; padding: 25px 20px; text-align: center; }
+        .header h1 { margin-bottom: 5px; font-size: 24px; }
+        .header p { opacity: 0.9; font-weight: 300; }
+
+        /* Controls Section - Flex Wrap for Responsive */
+        .controls-section { padding: 20px; background: #fff; border-bottom: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; }
+        .filter-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        
+        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+        select:focus, input:focus { border-color: #0d6efd; }
+        
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center; white-space: nowrap; }
         .btn-primary { background: #0d6efd; color: white; }
         .btn-success { background: #198754; color: white; }
         .btn-secondary { background: #6c757d; color: white; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 25px; }
+        /* KPI Grid - Auto Fit */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 20px; }
         
-        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-left: 6px solid #0d6efd; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; }
+        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #0d6efd; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
         .kpi-card.total-up { border-color: #6610f2; }
         .kpi-card.p1 { border-color: #198754; }
         .kpi-card.up-p2 { border-color: #ffc107; }
         .kpi-card.unconverted { border-color: #adb5bd; }
         
-        .kpi-title { color: #6c757d; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-        .kpi-value { font-size: 32px; font-weight: 700; margin-bottom: 5px; }
+        .kpi-title { color: #6c757d; font-size: 13px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi-value { font-size: 28px; font-weight: 700; margin-bottom: 2px; line-height: 1.2; }
         .kpi-percent { font-size: 14px; font-weight: 500; color: #198754; }
 
-        .content-layout { display: flex; flex-wrap: wrap; padding: 0 25px 25px; gap: 20px; }
-        .chart-box { flex: 1; min-width: 300px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; }
-        .table-box { flex: 2; min-width: 600px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; display: flex; flex-direction: column; }
+        /* Content Layout */
+        .content-layout { display: flex; flex-wrap: wrap; padding: 0 20px 20px; gap: 20px; }
         
-        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; flex-grow: 1; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th { background: #f8f9fa; padding: 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; }
-        td { padding: 12px 15px; border-bottom: 1px solid #f1f1f1; }
+        /* Flex Basis for Responsive Widths */
+        .chart-box { flex: 1 1 350px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+        .table-box { flex: 2 1 500px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+        
+        .full-width-section { width: 100%; padding: 0 20px 20px; }
+
+        /* Table Styling */
+        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; flex-grow: 1; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; /* Force scroll on small screens */ }
+        th { background: #f8f9fa; padding: 12px 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; white-space: nowrap; }
+        td { padding: 10px 15px; border-bottom: 1px solid #f1f1f1; vertical-align: middle; }
         
         tfoot { background-color: #e9ecef; font-weight: bold; border-top: 2px solid #dee2e6; }
-        tfoot td { color: #000; padding: 15px; font-size: 16px; }
+        tfoot td { color: #000; padding: 12px 15px; }
 
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-block; }
         .bg-p1 { background: #d1e7dd; color: #0f5132; }
         .bg-up-p2 { background: #fff3cd; color: #664d03; }
         .bg-total-up { background: #e0cffc; color: #3d0a91; }
         
-        .full-width-section { width: 100%; padding: 0 25px 25px; }
-        
-        #statusMessage { font-size: 14px; font-weight: 500; }
+        #statusMessage { font-size: 14px; font-weight: 500; width: 100%; text-align: center; margin-top: 10px; }
         .error { color: #dc3545; }
         .success { color: #198754; }
-        
-        #debugInfo { font-size: 11px; color: #666; margin-top: 5px; font-family: monospace; word-break: break-all; }
+        #debugInfo { font-size: 11px; color: #999; margin-top: 5px; font-family: monospace; width: 100%; text-align: center; word-break: break-all; }
+
+        /* --- RESPONSIVE MEDIA QUERIES --- */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .header { padding: 20px 15px; }
+            .header h1 { font-size: 20px; }
+            
+            /* Controls Stack vertically */
+            .controls-section { flex-direction: column; align-items: stretch; gap: 10px; }
+            .filter-group { flex-direction: column; width: 100%; align-items: stretch; }
+            .filter-group span { text-align: center; display: none; /* Hide 'ถึง' word to save space */ }
+            select, input, .btn { width: 100%; }
+            
+            /* Grid Adjustment 2 cols */
+            .dashboard-grid { grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+            .kpi-card { padding: 15px 10px; }
+            .kpi-value { font-size: 24px; }
+            
+            /* Content Stack */
+            .content-layout { padding: 0 10px 10px; gap: 15px; }
+            .full-width-section { padding: 0 10px 10px; }
+            
+            /* Box Sizing */
+            .chart-box, .table-box { flex: 1 1 100%; min-width: 100%; height: auto; }
+            .chart-box { min-height: 300px; }
+            .table-box { min-height: 400px; }
+            
+            h3 { font-size: 16px; margin-bottom: 10px; }
+        }
+
+        @media (max-width: 480px) {
+             /* 1 Col for very small screens if needed, but 2 cols usually looks better for KPI */
+            .dashboard-grid { gap: 8px; }
+            .kpi-title { font-size: 11px; }
+        }
     </style>
 </head>
 <body>
@@ -69,20 +118,21 @@
 
     <div class="controls-section">
         <div class="filter-group">
-            <label>สาขา:</label>
+            <label style="display:none;">สาขา:</label>
             <select id="branchSelector">
+                <option value="" disabled selected>-- เลือกสาขา --</option>
                 <option value="Choc">Choc (เชียงใหม่)</option>
                 <option value="Bangyai">Bangyai (กรุงเทพฯ)</option>
                 <option value="Sriracha">Sriracha (ชลบุรี)</option>
-                <option value="Ram">Ram (รามอินทรา)</option>
+                <option value="Ram">Ram (รามคำแหง)</option>
                 <option value="Bornsong">Bornsong</option>
             </select>
             <button class="btn btn-primary" onclick="fetchAndProcessData()" id="loadBtn">🔄 โหลดข้อมูล</button>
         </div>
         <div class="filter-group">
-            <input type="date" id="startDate">
+            <input type="date" id="startDate" placeholder="วันเริ่มต้น">
             <span>ถึง</span>
-            <input type="date" id="endDate">
+            <input type="date" id="endDate" placeholder="วันสิ้นสุด">
             <button class="btn btn-success" onclick="applyFiltersAndAnalyze()" id="filterBtn" disabled>🔍 กรองข้อมูล</button>
             <button class="btn btn-secondary" onclick="clearFilters()" id="clearBtn" disabled>ล้าง</button>
         </div>
@@ -95,13 +145,11 @@
             <div class="kpi-card">
                 <div class="kpi-title">🎯 กลุ่มเป้าหมาย P2</div>
                 <div class="kpi-value" id="totalP2">0</div>
-                <div style="font-size: 12px; color: #999;">(บิล P2 ตั้งต้น)</div>
-            </div>
+                </div>
             
             <div class="kpi-card total-up">
                 <div class="kpi-title">💜 บิล UP P2 ทั้งหมด</div>
                 <div class="kpi-value" id="totalAllUpP2">0</div>
-                <div style="font-size: 12px; color: #999;">(นับทุกใบเสร็จ)</div>
             </div>
 
             <div class="kpi-card p1">
@@ -115,7 +163,7 @@
                 <div class="kpi-percent" id="percUpP2">0%</div>
             </div>
             <div class="kpi-card unconverted">
-                <div class="kpi-title">❌ ยังไม่เปลี่ยนสถานะ</div>
+                <div class="kpi-title">❌ ยังไม่เปลี่ยน</div>
                 <div class="kpi-value" id="countNone">0</div>
                 <div class="kpi-percent" style="color:#6c757d" id="percNone">0%</div>
             </div>
@@ -123,8 +171,10 @@
 
         <div class="content-layout">
             <div class="chart-box">
-                <h3 style="text-align:center; margin-bottom:20px;">สัดส่วนการปิดการขาย (จาก P2)</h3>
-                <canvas id="mainChart"></canvas>
+                <h3 style="text-align:center; margin-bottom:15px;">สัดส่วนการปิดการขาย (จาก P2)</h3>
+                <div style="position: relative; height: 85%;">
+                    <canvas id="mainChart"></canvas>
+                </div>
             </div>
             <div class="table-box">
                 <h3>🏆 รายชื่อยอดขาย UP P2 ทั้งหมด</h3>
@@ -135,8 +185,8 @@
                                 <th>ชื่อลูกค้า</th>
                                 <th>รายการที่สนใจ</th>
                                 <th>สถานะ</th>
-                                <th>ยอดปิดการขาย</th>
-                                <th>วันที่ทำรายการ</th>
+                                <th>ยอดปิด</th>
+                                <th>วันที่</th>
                                 <th>Sale</th>
                             </tr>
                         </thead>
@@ -149,7 +199,7 @@
 
         <div class="full-width-section">
             <div class="table-box" style="height: auto; min-height: 400px;">
-                <h3 style="color: #dc3545;">⚠️ รายชื่อลูกค้า P2 ที่ต้องติดตาม (ยังไม่ปิดการขาย / ยังไม่เข้ามา)</h3>
+                <h3 style="color: #dc3545;">⚠️ ลูกค้า P2 รอติดตาม (ยังไม่ซื้อ / ยังไม่เข้า)</h3>
                 <div class="table-container">
                     <table id="pendingTable">
                         <thead>
@@ -157,9 +207,10 @@
                                 <th>วันที่ P2</th>
                                 <th>ชื่อลูกค้า</th>
                                 <th>เบอร์ติดต่อ</th>
-                                <th>Sale ดูแล</th>
+                                <th>Sale</th>
                                 <th>รายการที่สนใจ</th>
-                                <th>วันที่เข้าใช้บริการ</th> </tr>
+                                <th>วันที่เข้าใช้บริการ</th>
+                            </tr>
                         </thead>
                         <tbody id="pendingTableBody"></tbody>
                     </table>
@@ -199,6 +250,12 @@
         const branch = document.getElementById('branchSelector').value;
         const msg = document.getElementById('statusMessage');
         const debug = document.getElementById('debugInfo');
+        
+        if(!branch) {
+            alert("กรุณาเลือกสาขาก่อน");
+            return;
+        }
+
         const id = SHEETS[branch];
         const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
 
@@ -216,7 +273,7 @@
             
             if(rawData.length > 0) {
                 detectedHeaders = Object.keys(rawData[0]);
-                debug.innerHTML = "<b>เจอหัวตาราง:</b> " + detectedHeaders.join(" | ");
+                // debug.innerHTML = "<b>Headers:</b> " + detectedHeaders.join(" | ");
             }
 
             msg.innerHTML = `✅ โหลดสำเร็จ ${rawData.length} รายการ`;
@@ -346,7 +403,7 @@
                             phone: phone,
                             sale: getVal(log, 'Sale') || '-',
                             interest: getVal(log, 'รายการที่สนใจ') || '-',
-                            serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-' // เพิ่มการดึงข้อมูลวันที่เข้าใช้บริการ
+                            serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-'
                         });
                     }
                 }
@@ -477,7 +534,8 @@
                 <td>${row.phone}</td>
                 <td>${row.sale}</td>
                 <td style="font-size:12px; color:#666;">${row.interest}</td>
-                <td style="color:#0d6efd;">${row.serviceDate}</td> </tr>
+                <td style="color:#0d6efd;">${row.serviceDate}</td>
+            </tr>
         `).join('') : '<tr><td colspan="6" style="text-align:center; padding: 20px; color:#198754;">เยี่ยมมาก! ไม่มีงานค้างติดตาม</td></tr>';
     }
 
