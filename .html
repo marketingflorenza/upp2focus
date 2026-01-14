@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2 Dashboard (Bornsong Fixed)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
+        body { background-color: #f0f2f5; padding: 20px; color: #1a1a1a; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); color: white; padding: 30px; text-align: center; }
+        .controls-section { padding: 20px; background: #fff; border-bottom: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; }
+        .filter-group { display: flex; align-items: center; gap: 10px; }
+        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+        .btn-primary { background: #0d6efd; color: white; }
+        .btn-success { background: #198754; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 25px; }
+        
+        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-left: 6px solid #0d6efd; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; }
+        .kpi-card.total-up { border-color: #6610f2; }
+        .kpi-card.p1 { border-color: #198754; }
+        .kpi-card.up-p2 { border-color: #ffc107; }
+        .kpi-card.unconverted { border-color: #adb5bd; }
+        
+        .kpi-title { color: #6c757d; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .kpi-value { font-size: 32px; font-weight: 700; margin-bottom: 5px; }
+        .kpi-percent { font-size: 14px; font-weight: 500; color: #198754; }
+
+        .content-layout { display: flex; flex-wrap: wrap; padding: 0 25px 25px; gap: 20px; }
+        .chart-box { flex: 1; min-width: 300px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; }
+        .table-box { flex: 2; min-width: 600px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; display: flex; flex-direction: column; }
+        
+        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; flex-grow: 1; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #f8f9fa; padding: 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; }
+        td { padding: 12px 15px; border-bottom: 1px solid #f1f1f1; }
+        
+        tfoot { background-color: #e9ecef; font-weight: bold; border-top: 2px solid #dee2e6; }
+        tfoot td { color: #000; padding: 15px; font-size: 16px; }
+
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .bg-p1 { background: #d1e7dd; color: #0f5132; }
+        .bg-up-p2 { background: #fff3cd; color: #664d03; }
+        .bg-total-up { background: #e0cffc; color: #3d0a91; }
+        
+        .full-width-section { width: 100%; padding: 0 25px 25px; }
+        
+        #statusMessage { font-size: 14px; font-weight: 500; }
+        .error { color: #dc3545; }
+        .success { color: #198754; }
+        
+        #debugInfo { font-size: 11px; color: #666; margin-top: 5px; font-family: monospace; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>วิเคราะห์ Sales & Conversion (UP P2 Focus)</h1>
+        <p>ระบบติดตามผลงานการเปลี่ยนสถานะลูกค้าแบบ Real-time</p>
+    </div>
+
+    <div class="controls-section">
+        <div class="filter-group">
+            <label>สาขา:</label>
+            <select id="branchSelector">
+                <option value="Choc">Choc (เชียงใหม่)</option>
+                <option value="Bangyai">Bangyai (กรุงเทพฯ)</option>
+                <option value="Sriracha">Sriracha (ชลบุรี)</option>
+                <option value="Ram">Ram (รามอินทรา)</option>
+                <option value="Bornsong">Bornsong</option>
+            </select>
+            <button class="btn btn-primary" onclick="fetchAndProcessData()" id="loadBtn">🔄 โหลดข้อมูล</button>
+        </div>
+        <div class="filter-group">
+            <input type="date" id="startDate">
+            <span>ถึง</span>
+            <input type="date" id="endDate">
+            <button class="btn btn-success" onclick="applyFiltersAndAnalyze()" id="filterBtn" disabled>🔍 กรองข้อมูล</button>
+            <button class="btn btn-secondary" onclick="clearFilters()" id="clearBtn" disabled>ล้าง</button>
+        </div>
+        <div id="statusMessage"></div>
+        <div id="debugInfo"></div>
+    </div>
+
+    <div id="dashboardContent" style="display: none;">
+        <div class="dashboard-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">🎯 กลุ่มเป้าหมาย P2</div>
+                <div class="kpi-value" id="totalP2">0</div>
+                <div style="font-size: 12px; color: #999;">(บิล P2 ตั้งต้น)</div>
+            </div>
+            
+            <div class="kpi-card total-up">
+                <div class="kpi-title">💜 บิล UP P2 ทั้งหมด</div>
+                <div class="kpi-value" id="totalAllUpP2">0</div>
+                <div style="font-size: 12px; color: #999;">(นับทุกใบเสร็จ)</div>
+            </div>
+
+            <div class="kpi-card p1">
+                <div class="kpi-title">✅ เปลี่ยนเป็น P1</div>
+                <div class="kpi-value" id="countP1">0</div>
+                <div class="kpi-percent" id="percP1">0%</div>
+            </div>
+            <div class="kpi-card up-p2">
+                <div class="kpi-title">⚠️ Upgrade UP P2</div>
+                <div class="kpi-value" id="countUpP2">0</div>
+                <div class="kpi-percent" id="percUpP2">0%</div>
+            </div>
+            <div class="kpi-card unconverted">
+                <div class="kpi-title">❌ ยังไม่เปลี่ยนสถานะ</div>
+                <div class="kpi-value" id="countNone">0</div>
+                <div class="kpi-percent" style="color:#6c757d" id="percNone">0%</div>
+            </div>
+        </div>
+
+        <div class="content-layout">
+            <div class="chart-box">
+                <h3 style="text-align:center; margin-bottom:20px;">สัดส่วนการปิดการขาย (จาก P2)</h3>
+                <canvas id="mainChart"></canvas>
+            </div>
+            <div class="table-box">
+                <h3>🏆 รายชื่อยอดขาย UP P2 ทั้งหมด</h3>
+                <div class="table-container">
+                    <table id="resultTable">
+                        <thead>
+                            <tr>
+                                <th>ชื่อลูกค้า</th>
+                                <th>รายการที่สนใจ</th>
+                                <th>สถานะ</th>
+                                <th>ยอดปิดการขาย</th>
+                                <th>วันที่ทำรายการ</th>
+                                <th>Sale</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTableBody"></tbody>
+                        <tfoot id="resultTableFoot"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="full-width-section">
+            <div class="table-box" style="height: auto; min-height: 400px;">
+                <h3 style="color: #dc3545;">⚠️ รายชื่อลูกค้า P2 ที่ต้องติดตาม (ยังไม่ปิดการขาย / ยังไม่เข้ามา)</h3>
+                <div class="table-container">
+                    <table id="pendingTable">
+                        <thead>
+                            <tr>
+                                <th>วันที่ P2</th>
+                                <th>ชื่อลูกค้า</th>
+                                <th>เบอร์ติดต่อ</th>
+                                <th>Sale ดูแล</th>
+                                <th>รายการที่สนใจ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let rawData = [];
+    let myChart = null;
+    let detectedHeaders = []; 
+
+    const SHEETS = {
+        'Choc': '1F2bTvP1ySUT1q6fzRPQu7UpKNW_ze8GtKkd2rmRUjkI',
+        'Bangyai': '1JU-rhoWIEHH4oSwIWApo8mUC8zQpNcT0Xd-70E_6CNM',
+        'Sriracha': '1PdYqXkrrRGIv-6cCgOn8VXE6MpQhMlBGpFw7BbfzFbI',
+        'Ram': '1LFoETe4YdPIxxj27bXxNRip9dKJ-sL7bbDv820ExEtk',
+        'Bornsong': '1dlgM7YaQmJQTuiuNdAMb6tjKHllPgIs8MjfgGZnp8jU' // อัปเดต ID สาขา Bornsong แล้ว
+    };
+
+    function getVal(row, keyName) {
+        if (!row) return '';
+        if (row[keyName] !== undefined) return row[keyName];
+        const target = keyName.replace(/\s+/g, '').toLowerCase();
+        for (let k in row) {
+            if (k.replace(/\s+/g, '').toLowerCase() === target) {
+                return row[k];
+            }
+        }
+        return '';
+    }
+
+    async function fetchAndProcessData() {
+        const branch = document.getElementById('branchSelector').value;
+        const msg = document.getElementById('statusMessage');
+        const debug = document.getElementById('debugInfo');
+        const id = SHEETS[branch];
+        const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
+
+        msg.innerHTML = "⏳ กำลังดึงข้อมูล...";
+        msg.className = "";
+        debug.innerHTML = "";
+        
+        try {
+            const resp = await fetch(url);
+            const text = await resp.text();
+            
+            if (text.includes("google.com/accounts")) throw new Error("กรุณาแชร์ Sheet เป็น Public");
+
+            rawData = parseCSV(text);
+            
+            if(rawData.length > 0) {
+                detectedHeaders = Object.keys(rawData[0]);
+                debug.innerHTML = "<b>เจอหัวตาราง:</b> " + detectedHeaders.join(" | ");
+            }
+
+            msg.innerHTML = `✅ โหลดสำเร็จ ${rawData.length} รายการ`;
+            msg.className = "success";
+            
+            document.getElementById('filterBtn').disabled = false;
+            document.getElementById('clearBtn').disabled = false;
+            document.getElementById('dashboardContent').style.display = 'block';
+            
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            document.getElementById('startDate').valueAsDate = firstDay;
+            document.getElementById('endDate').valueAsDate = today;
+
+            applyFiltersAndAnalyze();
+        } catch (e) {
+            msg.innerHTML = "❌ Error: " + e.message;
+            msg.className = "error";
+        }
+    }
+
+    function applyFiltersAndAnalyze() {
+        const start = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+        const end = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+        if(start) start.setHours(0,0,0,0);
+        if(end) end.setHours(23,59,59,999);
+
+        const userHistory = {};
+        
+        rawData.forEach(row => {
+            const phone = getVal(row, 'เบอร์ติดต่อ')?.trim();
+            const date = parseDate(getVal(row, 'วันที่'));
+            const note = getVal(row, 'หมายเหตุ')?.trim().toUpperCase();
+            
+            if (!phone || !date) return;
+
+            if (!userHistory[phone]) userHistory[phone] = [];
+            userHistory[phone].push({ ...row, _date: date, _note: note });
+        });
+
+        let countP2_Targets = 0;
+        let countP1_Converted = 0;
+        let countUpP2_Converted = 0;
+        let countTotal_UpP2_Bills = 0;
+
+        let allSalesList = []; 
+        let pendingDetails = [];
+        
+        const checkedKeysP2 = new Set();
+        const checkedKeysAllUp = new Set(); 
+
+        // Loop A: Total UP P2 Only (No P1)
+        for (const phone in userHistory) {
+            userHistory[phone].forEach(log => {
+                if (!isWithin(log._date, start, end)) return;
+
+                const dayKey = `${phone}_${log._date.getTime()}`;
+                
+                const amtUpP2 = parseAmount(getVal(log, 'ยอดอัพ P2'));
+                
+                if ((log._note === 'UP P2' || amtUpP2 > 0) && !checkedKeysAllUp.has(dayKey)) {
+                    countTotal_UpP2_Bills++;
+                    checkedKeysAllUp.add(dayKey);
+                    
+                    allSalesList.push({
+                        name: getVal(log, 'ชื่อลูกค้า'),
+                        status: 'UP P2',
+                        amt: amtUpP2,
+                        date: log._date,
+                        sale: getVal(log, 'Sale'),
+                        interest: getVal(log, 'รายการที่สนใจ')
+                    });
+                }
+            });
+        }
+
+
+        // Loop B: Conversion Funnel
+        for (const phone in userHistory) {
+            const logs = userHistory[phone].sort((a, b) => a._date - b._date);
+            
+            logs.forEach((log, idx) => {
+                if (!isWithin(log._date, start, end)) return;
+
+                const dayKey = `${phone}_${log._date.getTime()}`;
+                
+                if (log._note === 'P2' && !checkedKeysP2.has(dayKey)) {
+                    countP2_Targets++;
+                    checkedKeysP2.add(dayKey);
+
+                    let isConverted = false;
+                    
+                    const p1AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P1'));
+                    const upP2AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P2'));
+
+                    if (p1AmtSelf > 0) {
+                        countP1_Converted++;
+                        isConverted = true;
+                    } else if (upP2AmtSelf > 0) {
+                        countUpP2_Converted++;
+                        isConverted = true;
+                    }
+
+                    if (!isConverted) {
+                        for (let i = idx + 1; i < logs.length; i++) {
+                            const next = logs[i];
+                            const p1AmtNext = parseAmount(getVal(next, 'ยอดอัพ P1'));
+                            const upP2AmtNext = parseAmount(getVal(next, 'ยอดอัพ P2'));
+                            const nextNote = next._note;
+
+                            if (nextNote === 'P1' || p1AmtNext > 0) {
+                                countP1_Converted++;
+                                isConverted = true;
+                                break;
+                            } else if (nextNote === 'UP P2' || upP2AmtNext > 0) {
+                                countUpP2_Converted++;
+                                isConverted = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!isConverted) {
+                        pendingDetails.push({
+                            p2Date: log._date,
+                            name: getVal(log, 'ชื่อลูกค้า'),
+                            phone: phone,
+                            sale: getVal(log, 'Sale') || '-',
+                            interest: getVal(log, 'รายการที่สนใจ') || '-'
+                        });
+                    }
+                }
+            });
+        }
+
+        const countNone = Math.max(0, countP2_Targets - (countP1_Converted + countUpP2_Converted));
+
+        // --- Update UI ---
+        document.getElementById('totalP2').innerText = countP2_Targets;
+        document.getElementById('totalAllUpP2').innerText = countTotal_UpP2_Bills;
+        document.getElementById('countP1').innerText = countP1_Converted;
+        document.getElementById('countUpP2').innerText = countUpP2_Converted;
+        document.getElementById('countNone').innerText = countNone;
+
+        const getPerc = (v) => countP2_Targets > 0 ? ((v/countP2_Targets)*100).toFixed(1) + '%' : '0%';
+        document.getElementById('percP1').innerText = getPerc(countP1_Converted);
+        document.getElementById('percUpP2').innerText = getPerc(countUpP2_Converted);
+        document.getElementById('percNone').innerText = getPerc(countNone);
+
+        updateChart(countP1_Converted, countUpP2_Converted, countNone);
+        updateSuccessTable(allSalesList);
+        updatePendingTable(pendingDetails);
+    }
+
+    // --- Utility Functions ---
+
+    function parseCSV(text) {
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+        return lines.slice(1).map(line => {
+            const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            const obj = {};
+            headers.forEach((h, i) => {
+                obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '';
+            });
+            return obj;
+        });
+    }
+
+    function parseDate(s) {
+        if (!s) return null;
+        const parts = s.split(/[\/\-\.]/);
+        if (parts.length < 3) return null;
+        
+        let p0 = parseInt(parts[0]);
+        let p1 = parseInt(parts[1]);
+        let p2 = parseInt(parts[2]);
+        let d, m, y;
+
+        if (p1 > 12) { m = p0; d = p1; y = p2; } 
+        else { m = p0; d = p1; y = p2; }
+
+        if (y > 2500) y -= 543;
+        if (y < 100) y += 2000;
+        return new Date(y, m - 1, d);
+    }
+
+    function parseAmount(str) {
+        if (!str) return 0;
+        if (typeof str !== 'string') str = String(str);
+        return parseFloat(str.replace(/,/g, '')) || 0;
+    }
+
+    function isWithin(d, s, e) {
+        if (!d) return false;
+        if (s && d < s) return false;
+        if (e && d > e) return false;
+        return true;
+    }
+
+    function updateChart(p1, up, none) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['เปลี่ยนเป็น P1', 'อัพเกรด UP P2', 'ยังไม่เปลี่ยนสถานะ'],
+                datasets: [{
+                    data: [p1, up, none],
+                    backgroundColor: ['#198754', '#ffc107', '#adb5bd']
+                }]
+            },
+            options: { maintainAspectRatio: false }
+        });
+    }
+
+    function updateSuccessTable(data) {
+        const body = document.getElementById('resultTableBody');
+        const footer = document.getElementById('resultTableFoot');
+        
+        data.sort((a, b) => b.date - a.date);
+        
+        body.innerHTML = data.length ? data.map(row => `
+            <tr>
+                <td><b>${row.name}</b></td>
+                <td style="font-size:13px; color:#555;">${row.interest || '-'}</td>
+                <td><span class="status-badge bg-total-up">${row.status}</span></td>
+                <td>${Number(row.amt || 0).toLocaleString()}</td>
+                <td>${row.date.toLocaleDateString('th-TH')}</td>
+                <td>${row.sale || '-'}</td>
+            </tr>
+        `).join('') : '<tr><td colspan="6" style="text-align:center; padding: 20px;">ไม่มีรายการ UP P2 ในช่วงนี้</td></tr>';
+
+        const total = data.reduce((sum, row) => sum + (row.amt || 0), 0);
+        
+        if (data.length > 0) {
+            footer.innerHTML = `
+                <tr>
+                    <td colspan="3" style="text-align:right;">รวมยอดขายทั้งหมด:</td>
+                    <td style="color:#198754; font-size:18px;">${total.toLocaleString()} บาท</td>
+                    <td colspan="2"></td>
+                </tr>
+            `;
+        } else {
+            footer.innerHTML = '';
+        }
+    }
+
+    function updatePendingTable(data) {
+        const body = document.getElementById('pendingTableBody');
+        data.sort((a, b) => a.p2Date - b.p2Date);
+        
+        body.innerHTML = data.length ? data.map(row => `
+            <tr>
+                <td>${row.p2Date.toLocaleDateString('th-TH')}</td>
+                <td><b>${row.name}</b></td>
+                <td>${row.phone}</td>
+                <td>${row.sale}</td>
+                <td style="font-size:12px; color:#666;">${row.interest}</td>
+            </tr>
+        `).join('') : '<tr><td colspan="5" style="text-align:center; padding: 20px; color:#198754;">เยี่ยมมาก! ไม่มีงานค้างติดตาม</td></tr>';
+    }
+
+    function clearFilters() {
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        applyFiltersAndAnalyze();
+    }
+</script>
+
+</body>
+</html>
