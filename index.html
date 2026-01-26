@@ -215,55 +215,74 @@
     import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // 1. Config & Init
-    const firebaseConfig = JSON.parse(__firebase_config);
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
     // Global variable to store tracking data from Firestore
     let trackingState = {};
     let isFirebaseReady = false;
+    let app, auth, db, appId;
 
-    // 2. Auth & Listeners
-    const initAuth = async () => {
-        try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        } catch (err) {
-            console.error("Auth failed:", err);
-            document.getElementById('statusMessage').innerHTML = `<span class="error">Database Auth Error: ${err.message}</span>`;
+    // 1. Safe Initialization
+    try {
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            const firebaseConfig = JSON.parse(__firebase_config);
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            
+            initAuthSequence();
+        } else {
+            console.warn("Firebase configuration not found. Running in offline mode.");
+            document.getElementById('statusMessage').innerHTML = `<span class="error">Database Config Missing: Tracking features disabled.</span>`;
         }
-    };
-    initAuth();
+    } catch (e) {
+        console.error("Firebase Initialization Error:", e);
+        document.getElementById('statusMessage').innerHTML = `<span class="error">Init Error: ${e.message}</span>`;
+    }
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            // Subscribe to Firestore changes
-            const trackingCol = collection(db, 'artifacts', appId, 'public', 'data', 'p2_tracking');
-            onSnapshot(trackingCol, (snapshot) => {
-                trackingState = {};
-                snapshot.forEach(doc => {
-                    trackingState[doc.id] = doc.data();
-                });
-                isFirebaseReady = true;
-                // If data is already displayed, refresh the pending table to show saved states
-                if (document.getElementById('pendingTableBody').innerHTML !== "") {
-                    refreshPendingTableUI(); 
+    // 2. Auth & Listeners Sequence
+    function initAuthSequence() {
+        if (!auth) return;
+
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
                 }
-            }, (error) => {
-                console.error("Snapshot error:", error);
-            });
-        }
-    });
+            } catch (err) {
+                console.error("Auth failed:", err);
+                document.getElementById('statusMessage').innerHTML = `<span class="error">Database Auth Error: ${err.message}</span>`;
+            }
+        };
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                const trackingCol = collection(db, 'artifacts', appId, 'public', 'data', 'p2_tracking');
+                onSnapshot(trackingCol, (snapshot) => {
+                    trackingState = {};
+                    snapshot.forEach(doc => {
+                        trackingState[doc.id] = doc.data();
+                    });
+                    isFirebaseReady = true;
+                    if (document.getElementById('pendingTableBody').innerHTML !== "") {
+                        refreshPendingTableUI(); 
+                    }
+                }, (error) => {
+                    console.error("Snapshot error:", error);
+                    // Silent fail or UI indication if needed, but don't block main app
+                });
+            }
+        });
+    }
 
     // 3. Save Function
     window.saveTracking = async (id, field, value) => {
-        if (!auth.currentUser) return;
+        if (!auth || !auth.currentUser) {
+            console.warn("Cannot save: User not authenticated.");
+            return;
+        }
         const ref = doc(db, 'artifacts', appId, 'public', 'data', 'p2_tracking', id);
         try {
             await setDoc(ref, {
@@ -273,7 +292,7 @@
             }, { merge: true });
         } catch (e) {
             console.error("Save failed", e);
-            alert("บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่");
+            // Optionally alert user or retry
         }
     };
 
