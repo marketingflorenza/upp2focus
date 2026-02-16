@@ -1,1099 +1,490 @@
 <!DOCTYPE html>
-
 <html lang="th">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>P2 Dashboard (Responsive)</title>
-
+    <title>P2 Sales Dashboard (Data Sync Fixed)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #0d6efd;
+            --success: #198754;
+            --warning: #ffc107;
+            --purple: #6610f2;
+            --gray: #6c757d;
+            --light: #f8f9fa;
+        }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
-
-        body { background-color: #f0f2f5; padding: 20px; color: #1a1a1a; font-size: 14px; }
-
+        body { background-color: #f4f7f6; color: #333; line-height: 1.6; }
         
-
-        /* Container Adjustment */
-
-        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
-
-        
-
-        .header { background: linear-gradient(135deg, #0d6efd 0%, #0dcaf0 100%); color: white; padding: 25px 20px; text-align: center; }
-
-        .header h1 { margin-bottom: 5px; font-size: 24px; }
-
-        .header p { opacity: 0.9; font-weight: 300; }
-
-
-
-        /* Controls Section - Flex Wrap for Responsive */
-
-        .controls-section { padding: 20px; background: #fff; border-bottom: 1px solid #eee; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; }
-
-        .filter-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
-
-        
-
-        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
-
-        select:focus, input:focus { border-color: #0d6efd; }
-
-        
-
-        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; gap: 8px; justify-content: center; white-space: nowrap; }
-
-        .btn-primary { background: #0d6efd; color: white; }
-
-        .btn-success { background: #198754; color: white; }
-
-        .btn-secondary { background: #6c757d; color: white; }
-
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
-
-
-
-        /* KPI Grid - Auto Fit */
-
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 20px; }
-
-        
-
-        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-left: 5px solid #0d6efd; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
-
-        .kpi-card.total-up { border-color: #6610f2; }
-
-        .kpi-card.p1 { border-color: #198754; }
-
-        .kpi-card.up-p2 { border-color: #ffc107; }
-
-        .kpi-card.unconverted { border-color: #adb5bd; }
-
-        
-
-        .kpi-title { color: #6c757d; font-size: 13px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        .kpi-value { font-size: 28px; font-weight: 700; margin-bottom: 2px; line-height: 1.2; }
-
-        .kpi-percent { font-size: 14px; font-weight: 500; color: #198754; }
-
-
-
-        /* Content Layout */
-
-        .content-layout { display: flex; flex-wrap: wrap; padding: 0 20px 20px; gap: 20px; }
-
-        
-
-        /* Flex Basis for Responsive Widths */
-
-        .chart-box { flex: 1 1 350px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
-
-        .table-box { flex: 2 1 500px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; height: 400px; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
-
-        
-
-        .full-width-section { width: 100%; padding: 0 20px 20px; }
-
-
-
-        /* Table Styling */
-
-        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; flex-grow: 1; -webkit-overflow-scrolling: touch; }
-
-        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; /* Force scroll on small screens */ }
-
-        th { background: #f8f9fa; padding: 12px 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; white-space: nowrap; }
-
-        td { padding: 10px 15px; border-bottom: 1px solid #f1f1f1; vertical-align: middle; }
-
-        
-
-        tfoot { background-color: #e9ecef; font-weight: bold; border-top: 2px solid #dee2e6; }
-
-        tfoot td { color: #000; padding: 12px 15px; }
-
-
-
-        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-block; }
-
-        .bg-p1 { background: #d1e7dd; color: #0f5132; }
-
-        .bg-up-p2 { background: #fff3cd; color: #664d03; }
-
-        .bg-total-up { background: #e0cffc; color: #3d0a91; }
-
-        
-
-        #statusMessage { font-size: 14px; font-weight: 500; width: 100%; text-align: center; margin-top: 10px; }
-
-        .error { color: #dc3545; }
-
-        .success { color: #198754; }
-
-        #debugInfo { font-size: 11px; color: #999; margin-top: 5px; font-family: monospace; width: 100%; text-align: center; word-break: break-all; }
-
-
-
-        /* --- RESPONSIVE MEDIA QUERIES --- */
-
-        @media (max-width: 768px) {
-
-            body { padding: 10px; }
-
-            .header { padding: 20px 15px; }
-
-            .header h1 { font-size: 20px; }
-
-            
-
-            /* Controls Stack vertically */
-
-            .controls-section { flex-direction: column; align-items: stretch; gap: 10px; }
-
-            .filter-group { flex-direction: column; width: 100%; align-items: stretch; }
-
-            .filter-group span { text-align: center; display: none; /* Hide 'ถึง' word to save space */ }
-
-            select, input, .btn { width: 100%; }
-
-            
-
-            /* Grid Adjustment 2 cols */
-
-            .dashboard-grid { grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
-
-            .kpi-card { padding: 15px 10px; }
-
-            .kpi-value { font-size: 24px; }
-
-            
-
-            /* Content Stack */
-
-            .content-layout { padding: 0 10px 10px; gap: 15px; }
-
-            .full-width-section { padding: 0 10px 10px; }
-
-            
-
-            /* Box Sizing */
-
-            .chart-box, .table-box { flex: 1 1 100%; min-width: 100%; height: auto; }
-
-            .chart-box { min-height: 300px; }
-
-            .table-box { min-height: 400px; }
-
-            
-
-            h3 { font-size: 16px; margin-bottom: 10px; }
-
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .header { 
+            background: linear-gradient(135deg, var(--primary) 0%, #0dcaf0 100%); 
+            color: white; padding: 30px 20px; border-radius: 15px;
+            text-align: center; margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.2);
         }
 
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #edf2f7; margin-bottom: 20px; overflow: hidden; }
+        .controls-section { padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between; }
+        .filter-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        
+        select, input { padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-secondary { background: #e2e8f0; color: #4a5568; }
 
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-bottom: 4px solid var(--primary); }
+        .kpi-card.p2 { border-color: var(--primary); }
+        .kpi-card.up-p2-total { border-color: var(--purple); }
+        .kpi-card.p1-conv { border-color: var(--success); }
+        .kpi-card.up-p2-conv { border-color: var(--warning); }
+        
+        .kpi-label { color: var(--gray); font-size: 13px; font-weight: 500; text-transform: uppercase; margin-bottom: 10px; }
+        .kpi-value { font-size: 32px; font-weight: 700; color: #1a202c; display: flex; align-items: baseline; gap: 5px; }
+        .kpi-sub { font-size: 14px; color: var(--success); font-weight: 500; }
 
-        @media (max-width: 480px) {
+        .main-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 25px; }
+        @media (max-width: 992px) { .main-layout { grid-template-columns: 1fr; } }
 
-             /* 1 Col for very small screens if needed, but 2 cols usually looks better for KPI */
+        .chart-container { height: 350px; padding: 20px; }
+        .table-container { height: 400px; overflow-y: auto; }
 
-            .dashboard-grid { gap: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #f8fafc; padding: 12px 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #e2e8f0; }
+        td { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; }
+        
+        .badge { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+        .bg-success { background: #dcfce7; color: #166534; }
+        .bg-warning { background: #fef9c3; color: #854d0e; }
+        .bg-purple { background: #f3e8ff; color: #581c87; }
 
-            .kpi-title { font-size: 11px; }
-
-        }
-
+        #statusText { padding: 10px; font-size: 14px; border-radius: 8px; text-align: center; display: none; margin-bottom: 15px; }
+        .status-loading { display: block !important; background: #e0f2fe; color: #0369a1; }
+        .status-error { display: block !important; background: #fee2e2; color: #991b1b; }
     </style>
-
 </head>
-
 <body>
 
-
-
 <div class="container">
-
     <div class="header">
-
-        <h1>วิเคราะห์ Sales & Conversion (UP P2 Focus)</h1>
-
-        <p>ระบบติดตามผลงานการเปลี่ยนสถานะลูกค้าแบบ Real-time</p>
-
+        <h1>Sales & Conversion Dashboard (P2 Focus)</h1>
+        <p>Sync ข้อมูลอัตโนมัติจากไฟล์ ยอดขายออนไลน์ (รองรับ UP P2 และ Missing Phone)</p>
     </div>
 
-
-
-    <div class="controls-section">
-
-        <div class="filter-group">
-
-            <label style="display:none;">สาขา:</label>
-
-            <select id="branchSelector">
-
-                <option value="" disabled selected>-- เลือกสาขา --</option>
-
-                <option value="Choc">Choc (เชียงใหม่)</option>
-
-                <option value="Bangyai">Bangyai (กรุงเทพฯ)</option>
-
-                <option value="Sriracha">Sriracha (ชลบุรี)</option>
-
-                <option value="Ram">Ram (รามอินทรา)</option>
-
-                <option value="Bornsong">Bornsong</option>
-
-            </select>
-
-            <button class="btn btn-primary" onclick="fetchAndProcessData()" id="loadBtn">🔄 โหลดข้อมูล</button>
-
+    <div class="card">
+        <div class="controls-section">
+            <div class="filter-group">
+                <select id="branchSelector">
+                    <option value="" disabled selected>-- เลือกสาขา --</option>
+                    <option value="Choc">Choc (FRC)</option>
+                    <option value="Bangyai">Bangyai (FRB)</option>
+                    <option value="Sriracha">Sriracha (FRS)</option>
+                    <option value="Ram">Ram (FRR)</option>
+                    <option value="Bornsong">BSK</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadData()">🔄 ดึงข้อมูล</button>
+            </div>
+            <div class="filter-group">
+                <input type="date" id="startDate">
+                <span>ถึง</span>
+                <input type="date" id="endDate">
+                <button class="btn btn-success" id="filterBtn" onclick="processData()" disabled>🔍 กรองข้อมูล</button>
+                <button class="btn btn-secondary" onclick="resetFilters()">ล้าง</button>
+            </div>
         </div>
-
-        <div class="filter-group">
-
-            <input type="date" id="startDate" placeholder="วันเริ่มต้น">
-
-            <span>ถึง</span>
-
-            <input type="date" id="endDate" placeholder="วันสิ้นสุด">
-
-            <button class="btn btn-success" onclick="applyFiltersAndAnalyze()" id="filterBtn" disabled>🔍 กรองข้อมูล</button>
-
-            <button class="btn btn-secondary" onclick="clearFilters()" id="clearBtn" disabled>ล้าง</button>
-
-        </div>
-
-        <div id="statusMessage"></div>
-
-        <div id="debugInfo"></div>
-
     </div>
 
+    <div id="statusText"></div>
 
-
-    <div id="dashboardContent" style="display: none;">
-
-        <div class="dashboard-grid">
-
-            <div class="kpi-card">
-
-                <div class="kpi-title">🎯 กลุ่มเป้าหมาย P2</div>
-
-                <div class="kpi-value" id="totalP2">0</div>
-
+    <div id="dashboard" style="display:none;">
+        <div class="kpi-grid">
+            <div class="kpi-card p2">
+                <div class="kpi-label">🎯 เป้าหมาย P2</div>
+                <div class="kpi-value" id="kpi-total-p2">0</div>
+            </div>
+            <div class="kpi-card up-p2-total">
+                <div class="kpi-label">💜 บิล UP P2 ทั้งหมด</div>
+                <div class="kpi-value" id="kpi-all-up-p2">0</div>
+            </div>
+            <div class="kpi-card p1-conv">
+                <div class="kpi-label">✅ เปลี่ยนเป็น P1</div>
+                <div class="kpi-value">
+                    <span id="kpi-conv-p1">0</span>
+                    <span class="kpi-sub" id="perc-p1">0%</span>
                 </div>
-
-            
-
-            <div class="kpi-card total-up">
-
-                <div class="kpi-title">💜 บิล UP P2 ทั้งหมด</div>
-
-                <div class="kpi-value" id="totalAllUpP2">0</div>
-
             </div>
-
-
-
-            <div class="kpi-card p1">
-
-                <div class="kpi-title">✅ เปลี่ยนเป็น P1</div>
-
-                <div class="kpi-value" id="countP1">0</div>
-
-                <div class="kpi-percent" id="percP1">0%</div>
-
+            <div class="kpi-card up-p2-conv">
+                <div class="kpi-label">⚠️ UP P2 (จาก P2)</div>
+                <div class="kpi-value">
+                    <span id="kpi-conv-up">0</span>
+                    <span class="kpi-sub" id="perc-up" style="color:var(--warning)">0%</span>
+                </div>
             </div>
-
-            <div class="kpi-card up-p2">
-
-                <div class="kpi-title">⚠️ Upgrade UP P2</div>
-
-                <div class="kpi-value" id="countUpP2">0</div>
-
-                <div class="kpi-percent" id="percUpP2">0%</div>
-
-            </div>
-
-            <div class="kpi-card unconverted">
-
-                <div class="kpi-title">❌ ยังไม่เปลี่ยน</div>
-
-                <div class="kpi-value" id="countNone">0</div>
-
-                <div class="kpi-percent" style="color:#6c757d" id="percNone">0%</div>
-
-            </div>
-
         </div>
 
-
-
-        <div class="content-layout">
-
-            <div class="chart-box">
-
-                <h3 style="text-align:center; margin-bottom:15px;">สัดส่วนการปิดการขาย (จาก P2)</h3>
-
-                <div style="position: relative; height: 85%;">
-
-                    <canvas id="mainChart"></canvas>
-
+        <div class="main-layout">
+            <div class="card">
+                <div class="chart-container">
+                    <h3 style="margin-bottom:15px; text-align:center; font-size:16px;">สัดส่วน Conversion จาก P2</h3>
+                    <canvas id="convChart"></canvas>
                 </div>
-
             </div>
-
-            <div class="table-box">
-
-                <h3>🏆 รายชื่อยอดขาย UP P2 ทั้งหมด</h3>
-
+            <div class="card">
+                <div style="padding:15px; border-bottom:1px solid #eee;">
+                    <h3 style="font-size:16px;">🏆 รายการ UP P2 ทั้งหมด</h3>
+                </div>
                 <div class="table-container">
-
-                    <table id="resultTable">
-
+                    <table id="successTable">
                         <thead>
-
                             <tr>
-
-                                <th>ชื่อลูกค้า</th>
-
-                                <th>รายการที่สนใจ</th>
-
-                                <th>สถานะ</th>
-
-                                <th>ยอดปิด</th>
-
                                 <th>วันที่</th>
-
-                                <th>Sale</th>
-
-                            </tr>
-
-                        </thead>
-
-                        <tbody id="resultTableBody"></tbody>
-
-                        <tfoot id="resultTableFoot"></tfoot>
-
-                    </table>
-
-                </div>
-
-            </div>
-
-        </div>
-
-
-
-        <div class="full-width-section">
-
-            <div class="table-box" style="height: auto; min-height: 400px;">
-
-                <h3 style="color: #dc3545;">⚠️ ลูกค้า P2 รอติดตาม (ยังไม่ซื้อ / ยังไม่เข้า)</h3>
-
-                <div class="table-container">
-
-                    <table id="pendingTable">
-
-                        <thead>
-
-                            <tr>
-
-                                <th>วันที่ P2</th>
-
                                 <th>ชื่อลูกค้า</th>
-
-                                <th>เบอร์ติดต่อ</th>
-
+                                <th>ยอดขาย</th>
                                 <th>Sale</th>
-
-                                <th>รายการที่สนใจ</th>
-
-                                <th>วันที่เข้าใช้บริการ</th>
-
                             </tr>
-
                         </thead>
-
-                        <tbody id="pendingTableBody"></tbody>
-
+                        <tbody id="successBody"></tbody>
                     </table>
-
                 </div>
-
             </div>
-
         </div>
 
-
-
+        <div class="card">
+            <div style="padding:15px 20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="font-size:16px; color:#e53e3e;">🚩 รายการ P2 รอติดตาม (ยังไม่มีการซื้อเพิ่ม)</h3>
+                <span id="pendingCount" class="badge bg-purple" style="font-size:14px;">0 รายการ</span>
+            </div>
+            <div class="table-container" style="height:400px;">
+                <table id="pendingTable">
+                    <thead>
+                        <tr>
+                            <th>วันที่ P2</th>
+                            <th>ชื่อลูกค้า</th>
+                            <th>เบอร์ติดต่อ</th>
+                            <th>รายการที่สนใจ</th>
+                            <th>Sale</th>
+                            <th>หมายเหตุ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingBody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
-
 </div>
 
-
-
 <script>
-
-    let rawData = [];
-
-    let myChart = null;
-
-    let detectedHeaders = []; 
-
-
-
     const SHEETS = {
-
         'Choc': '1F2bTvP1ySUT1q6fzRPQu7UpKNW_ze8GtKkd2rmRUjkI',
-
         'Bangyai': '1JU-rhoWIEHH4oSwIWApo8mUC8zQpNcT0Xd-70E_6CNM',
-
         'Sriracha': '1PdYqXkrrRGIv-6cCgOn8VXE6MpQhMlBGpFw7BbfzFbI',
-
         'Ram': '1LFoETe4YdPIxxj27bXxNRip9dKJ-sL7bbDv820ExEtk',
-
         'Bornsong': '1dlgM7YaQmJQTuiuNdAMb6tjKHllPgIs8MjfgGZnp8jU'
-
     };
 
+    let rawData = [];
+    let chartInstance = null;
 
-
-    function getVal(row, keyName) {
-
-        if (!row) return '';
-
-        if (row[keyName] !== undefined) return row[keyName];
-
-        const target = keyName.replace(/\s+/g, '').toLowerCase();
-
-        for (let k in row) {
-
-            if (k.replace(/\s+/g, '').toLowerCase() === target) {
-
-                return row[k];
-
+    // Helper: Find value with flexible keys
+    function getValFlexible(row, keywords) {
+        for (let key in row) {
+            const cleanKey = key.trim().toLowerCase().replace(/\s+/g, '');
+            for (let kw of keywords) {
+                const cleanKw = kw.toLowerCase().replace(/\s+/g, '');
+                if (cleanKey === cleanKw || cleanKey.includes(cleanKw)) return row[key];
             }
-
         }
-
         return '';
-
     }
 
+    // Helper: Parse Date (Thai Year and ISO format support)
+    function robustParseDate(s) {
+        if (!s) return null;
+        s = s.trim();
+        let d, m, y;
+        if (s.includes('-')) {
+            const p = s.split('-');
+            if (p[0].length === 4) { // YYYY-MM-DD
+                y = parseInt(p[0]); m = parseInt(p[1]); d = parseInt(p[2]);
+            } else { // DD-MM-YYYY
+                d = parseInt(p[0]); m = parseInt(p[1]); y = parseInt(p[2]);
+            }
+        } else if (s.includes('/')) {
+            const p = s.split('/');
+            d = parseInt(p[0]); m = parseInt(p[1]); y = parseInt(p[2]);
+        } else { return null; }
 
+        if (y > 2500) y -= 543; // Correct Thai BE Year
+        if (y < 100) y += 2000;
+        return new Date(y, m - 1, d);
+    }
 
-    async function fetchAndProcessData() {
+    // Helper: Clean Numeric values
+    function cleanNumeric(val) {
+        if (!val) return 0;
+        const cleaned = val.toString().replace(/[^\d.-]/g, '');
+        return parseFloat(cleaned) || 0;
+    }
 
+    // Helper: Normalize Name for matching
+    function normalizeName(name) {
+        if (!name) return '';
+        return name.replace(/^คุณ/, '').trim().replace(/\s+/g, '');
+    }
+
+    async function loadData() {
         const branch = document.getElementById('branchSelector').value;
+        const status = document.getElementById('statusText');
+        if(!branch) return alert("กรุณาเลือกสาขา");
 
-        const msg = document.getElementById('statusMessage');
-
-        const debug = document.getElementById('debugInfo');
-
-        
-
-        if(!branch) {
-
-            alert("กรุณาเลือกสาขาก่อน");
-
-            return;
-
-        }
-
-
-
-        const id = SHEETS[branch];
-
-        const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
-
-
-
-        msg.innerHTML = "⏳ กำลังดึงข้อมูล...";
-
-        msg.className = "";
-
-        debug.innerHTML = "";
-
-        
+        status.innerHTML = "⌛ กำลังดึงข้อมูลจาก Google Sheets...";
+        status.className = "status-loading";
 
         try {
-
+            const id = SHEETS[branch];
+            const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
             const resp = await fetch(url);
-
             const text = await resp.text();
-
             
-
-            if (text.includes("google.com/accounts")) throw new Error("กรุณาแชร์ Sheet เป็น Public");
-
-
-
             rawData = parseCSV(text);
-
-            
-
-            if(rawData.length > 0) {
-
-                detectedHeaders = Object.keys(rawData[0]);
-
-                // debug.innerHTML = "<b>Headers:</b> " + detectedHeaders.join(" | ");
-
-            }
-
-
-
-            msg.innerHTML = `✅ โหลดสำเร็จ ${rawData.length} รายการ`;
-
-            msg.className = "success";
-
-            
-
+            status.innerHTML = `✅ โหลดสำเร็จ ${rawData.length} แถว`;
             document.getElementById('filterBtn').disabled = false;
+            document.getElementById('dashboard').style.display = 'block';
 
-            document.getElementById('clearBtn').disabled = false;
+            // Default dates
+            const now = new Date();
+            document.getElementById('startDate').valueAsDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            document.getElementById('endDate').valueAsDate = now;
 
-            document.getElementById('dashboardContent').style.display = 'block';
-
-            
-
-            const today = new Date();
-
-            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-
-            document.getElementById('startDate').valueAsDate = firstDay;
-
-            document.getElementById('endDate').valueAsDate = today;
-
-
-
-            applyFiltersAndAnalyze();
-
+            processData();
         } catch (e) {
-
-            msg.innerHTML = "❌ Error: " + e.message;
-
-            msg.className = "error";
-
+            status.innerHTML = "❌ Error: " + e.message;
+            status.className = "status-error";
         }
-
     }
-
-
-
-    function applyFiltersAndAnalyze() {
-
-        const start = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
-
-        const end = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
-
-        if(start) start.setHours(0,0,0,0);
-
-        if(end) end.setHours(23,59,59,999);
-
-
-
-        const userHistory = {};
-
-        
-
-        rawData.forEach(row => {
-
-            const phone = getVal(row, 'เบอร์ติดต่อ')?.trim();
-
-            const date = parseDate(getVal(row, 'วันที่'));
-
-            const note = getVal(row, 'หมายเหตุ')?.trim().toUpperCase();
-
-            
-
-            if (!phone || !date) return;
-
-
-
-            if (!userHistory[phone]) userHistory[phone] = [];
-
-            userHistory[phone].push({ ...row, _date: date, _note: note });
-
-        });
-
-
-
-        let countP2_Targets = 0;
-
-        let countP1_Converted = 0;
-
-        let countUpP2_Converted = 0;
-
-        let countTotal_UpP2_Bills = 0;
-
-
-
-        let allSalesList = []; 
-
-        let pendingDetails = [];
-
-        
-
-        const checkedKeysP2 = new Set();
-
-        const checkedKeysAllUp = new Set(); 
-
-
-
-        // Loop A: Total UP P2 Only (No P1)
-
-        for (const phone in userHistory) {
-
-            userHistory[phone].forEach(log => {
-
-                if (!isWithin(log._date, start, end)) return;
-
-
-
-                const dayKey = `${phone}_${log._date.getTime()}`;
-
-                
-
-                const amtUpP2 = parseAmount(getVal(log, 'ยอดอัพ P2'));
-
-                
-
-                if ((log._note === 'UP P2' || amtUpP2 > 0) && !checkedKeysAllUp.has(dayKey)) {
-
-                    countTotal_UpP2_Bills++;
-
-                    checkedKeysAllUp.add(dayKey);
-
-                    
-
-                    allSalesList.push({
-
-                        name: getVal(log, 'ชื่อลูกค้า'),
-
-                        status: 'UP P2',
-
-                        amt: amtUpP2,
-
-                        date: log._date,
-
-                        sale: getVal(log, 'Sale'),
-
-                        interest: getVal(log, 'รายการที่สนใจ')
-
-                    });
-
-                }
-
-            });
-
-        }
-
-
-
-
-
-        // Loop B: Conversion Funnel
-
-        for (const phone in userHistory) {
-
-            const logs = userHistory[phone].sort((a, b) => a._date - b._date);
-
-            
-
-            logs.forEach((log, idx) => {
-
-                if (!isWithin(log._date, start, end)) return;
-
-
-
-                const dayKey = `${phone}_${log._date.getTime()}`;
-
-                
-
-                if (log._note === 'P2' && !checkedKeysP2.has(dayKey)) {
-
-                    countP2_Targets++;
-
-                    checkedKeysP2.add(dayKey);
-
-
-
-                    let isConverted = false;
-
-                    
-
-                    const p1AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P1'));
-
-                    const upP2AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P2'));
-
-
-
-                    if (p1AmtSelf > 0) {
-
-                        countP1_Converted++;
-
-                        isConverted = true;
-
-                    } else if (upP2AmtSelf > 0) {
-
-                        countUpP2_Converted++;
-
-                        isConverted = true;
-
-                    }
-
-
-
-                    if (!isConverted) {
-
-                        for (let i = idx + 1; i < logs.length; i++) {
-
-                            const next = logs[i];
-
-                            const p1AmtNext = parseAmount(getVal(next, 'ยอดอัพ P1'));
-
-                            const upP2AmtNext = parseAmount(getVal(next, 'ยอดอัพ P2'));
-
-                            const nextNote = next._note;
-
-
-
-                            if (nextNote === 'P1' || p1AmtNext > 0) {
-
-                                countP1_Converted++;
-
-                                isConverted = true;
-
-                                break;
-
-                            } else if (nextNote === 'UP P2' || upP2AmtNext > 0) {
-
-                                countUpP2_Converted++;
-
-                                isConverted = true;
-
-                                break;
-
-                            }
-
-                        }
-
-                    }
-
-
-
-                    if (!isConverted) {
-
-                        pendingDetails.push({
-
-                            p2Date: log._date,
-
-                            name: getVal(log, 'ชื่อลูกค้า'),
-
-                            phone: phone,
-
-                            sale: getVal(log, 'Sale') || '-',
-
-                            interest: getVal(log, 'รายการที่สนใจ') || '-',
-
-                            serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-'
-
-                        });
-
-                    }
-
-                }
-
-            });
-
-        }
-
-
-
-        const countNone = Math.max(0, countP2_Targets - (countP1_Converted + countUpP2_Converted));
-
-
-
-        // --- Update UI ---
-
-        document.getElementById('totalP2').innerText = countP2_Targets;
-
-        document.getElementById('totalAllUpP2').innerText = countTotal_UpP2_Bills;
-
-        document.getElementById('countP1').innerText = countP1_Converted;
-
-        document.getElementById('countUpP2').innerText = countUpP2_Converted;
-
-        document.getElementById('countNone').innerText = countNone;
-
-
-
-        const getPerc = (v) => countP2_Targets > 0 ? ((v/countP2_Targets)*100).toFixed(1) + '%' : '0%';
-
-        document.getElementById('percP1').innerText = getPerc(countP1_Converted);
-
-        document.getElementById('percUpP2').innerText = getPerc(countUpP2_Converted);
-
-        document.getElementById('percNone').innerText = getPerc(countNone);
-
-
-
-        updateChart(countP1_Converted, countUpP2_Converted, countNone);
-
-        updateSuccessTable(allSalesList);
-
-        updatePendingTable(pendingDetails);
-
-    }
-
-
-
-    // --- Utility Functions ---
-
-
 
     function parseCSV(text) {
-
         const lines = text.split('\n');
-
         const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-
         return lines.slice(1).map(line => {
-
             const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-
             const obj = {};
-
             headers.forEach((h, i) => {
-
                 obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '';
-
             });
-
             return obj;
+        });
+    }
 
+    function processData() {
+        const start = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
+        const end = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
+        if(start) start.setHours(0,0,0,0);
+        if(end) end.setHours(23,59,59,999);
+
+        const usersByPhone = {}; 
+        const usersByName = {}; 
+        
+        let p2Targets = 0;
+        let p1Converted = 0;
+        let upP2Converted = 0;
+        let allUpP2Bills = 0;
+        let successList = [];
+        let pendingList = [];
+
+        // 1. Pre-process and Group Data
+        rawData.forEach(row => {
+            const date = robustParseDate(getValFlexible(row, ['วันที่', 'date']));
+            if (!date) return;
+
+            const name = getValFlexible(row, ['ชื่อลูกค้า', 'ชื่อ']).trim();
+            const phone = getValFlexible(row, ['เบอร์ติดต่อ', 'เบอร์โทร', 'phone']).trim();
+            const note = getValFlexible(row, ['หมายเหตุ', 'note']).toUpperCase();
+            
+            const upP2Amt = cleanNumeric(getValFlexible(row, ['ยอดอัพP2', 'ยอดอัพ P2', 'UpP2']));
+            const upP1Amt = cleanNumeric(getValFlexible(row, ['ยอดอัพP1', 'ยอดอัพ P1', 'UpP1']));
+            const p1Flag = getValFlexible(row, ['P1', 'ยอดจอง']).trim();
+            const p2Flag = getValFlexible(row, ['P2']).trim();
+
+            const entry = {
+                ...row,
+                _date: date,
+                _name: name,
+                _normName: normalizeName(name),
+                _phone: phone,
+                _note: note,
+                _upP2Amt: upP2Amt,
+                _upP1Amt: upP1Amt,
+                _p1: p1Flag,
+                _p2: p2Flag
+            };
+
+            // Index by phone (if available)
+            if (phone && phone.length > 5) {
+                if (!usersByPhone[phone]) usersByPhone[phone] = [];
+                usersByPhone[phone].push(entry);
+            }
+            // Index by Normalized Name
+            if (entry._normName) {
+                if (!usersByName[entry._normName]) usersByName[entry._normName] = [];
+                usersByName[entry._normName].push(entry);
+            }
         });
 
-    }
+        // Track used IDs to avoid double counting conversion
+        const convertedUserIds = new Set();
 
-
-
-    function parseDate(s) {
-
-        if (!s) return null;
-
-        const parts = s.split(/[\/\-\.]/);
-
-        if (parts.length < 3) return null;
-
-        
-
-        let p0 = parseInt(parts[0]);
-
-        let p1 = parseInt(parts[1]);
-
-        let p2 = parseInt(parts[2]);
-
-        let d, m, y;
-
-
-
-        if (p1 > 12) { m = p0; d = p1; y = p2; } 
-
-        else { m = p0; d = p1; y = p2; }
-
-
-
-        if (y > 2500) y -= 543;
-
-        if (y < 100) y += 2000;
-
-        return new Date(y, m - 1, d);
-
-    }
-
-
-
-    function parseAmount(str) {
-
-        if (!str) return 0;
-
-        if (typeof str !== 'string') str = String(str);
-
-        return parseFloat(str.replace(/,/g, '')) || 0;
-
-    }
-
-
-
-    function isWithin(d, s, e) {
-
-        if (!d) return false;
-
-        if (s && d < s) return false;
-
-        if (e && d > e) return false;
-
-        return true;
-
-    }
-
-
-
-    function updateChart(p1, up, none) {
-
-        const ctx = document.getElementById('mainChart').getContext('2d');
-
-        if (myChart) myChart.destroy();
-
-        myChart = new Chart(ctx, {
-
-            type: 'doughnut',
-
-            data: {
-
-                labels: ['เปลี่ยนเป็น P1', 'อัพเกรด UP P2', 'ยังไม่เปลี่ยนสถานะ'],
-
-                datasets: [{
-
-                    data: [p1, up, none],
-
-                    backgroundColor: ['#198754', '#ffc107', '#adb5bd']
-
-                }]
-
-            },
-
-            options: { maintainAspectRatio: false }
-
+        // 2. Main Logic
+        // Loop through all data to find P2 targets within range and total UP P2 bills
+        rawData.forEach(row => {
+            // เราใช้ข้อมูลที่ถูก pre-process ไว้แล้ว (จะดีกว่าวนซ้ำ rawData ตรงๆ)
+            // แต่เพื่อให้ชัวร์ เราจะดึงข้อมูลที่ผ่านการ normalize แล้ว
         });
 
-    }
-
-
-
-    function updateSuccessTable(data) {
-
-        const body = document.getElementById('resultTableBody');
-
-        const footer = document.getElementById('resultTableFoot');
-
+        // ประมวลผลกลุ่มลูกค้า (Phone based first, then name based)
+        const allUserLogs = [];
+        for(let p in usersByPhone) allUserLogs.push(usersByPhone[p].sort((a,b)=>a._date-b._date));
         
+        // กรองยอดขายรวมทั้งหมดก่อน (KPI สีม่วง)
+        rawData.forEach(row => {
+            const d = robustParseDate(getValFlexible(row, ['วันที่']));
+            if (!d || d < start || d > end) return;
+            
+            const note = getValFlexible(row, ['หมายเหตุ']).toUpperCase();
+            const upP2 = cleanNumeric(getValFlexible(row, ['ยอดอัพ P2', 'ยอดอัพP2']));
+            
+            if (upP2 > 0 || note.includes('UP P2') || note.includes('UPP2')) {
+                allUpP2Bills++;
+                successList.push({
+                    date: d,
+                    name: getValFlexible(row, ['ชื่อลูกค้า']),
+                    amt: upP2,
+                    sale: getValFlexible(row, ['Sale', 'เซลล์'])
+                });
+            }
+        });
 
-        data.sort((a, b) => b.date - a.date);
+        // วิเคราะห์ Conversion
+        const processedP2Keys = new Set();
 
-        
-
-        body.innerHTML = data.length ? data.map(row => `
-
-            <tr>
-
-                <td><b>${row.name}</b></td>
-
-                <td style="font-size:13px; color:#555;">${row.interest || '-'}</td>
-
-                <td><span class="status-badge bg-total-up">${row.status}</span></td>
-
-                <td>${Number(row.amt || 0).toLocaleString()}</td>
-
-                <td>${row.date.toLocaleDateString('th-TH')}</td>
-
-                <td>${row.sale || '-'}</td>
-
-            </tr>
-
-        `).join('') : '<tr><td colspan="6" style="text-align:center; padding: 20px;">ไม่มีรายการ UP P2 ในช่วงนี้</td></tr>';
-
-
-
-        const total = data.reduce((sum, row) => sum + (row.amt || 0), 0);
-
-        
-
-        if (data.length > 0) {
-
-            footer.innerHTML = `
-
-                <tr>
-
-                    <td colspan="3" style="text-align:right;">รวมยอดขายทั้งหมด:</td>
-
-                    <td style="color:#198754; font-size:18px;">${total.toLocaleString()} บาท</td>
-
-                    <td colspan="2"></td>
-
-                </tr>
-
-            `;
-
-        } else {
-
-            footer.innerHTML = '';
-
+        for (let uid in usersByPhone) {
+            const logs = usersByPhone[uid].sort((a,b) => a._date - b._date);
+            processLogs(logs);
         }
 
-    }
+        // กรณีชื่ออย่างเดียว (ที่ไม่มีเบอร์โทร)
+        for (let name in usersByName) {
+            const logs = usersByName[name];
+            const hasPhone = logs.some(l => l._phone && l._phone.length > 5);
+            if (hasPhone) continue; // Skip because already processed in usersByPhone
+            processLogs(logs.sort((a,b) => a._date - b._date));
+        }
 
+        function processLogs(logs) {
+            logs.forEach((log, idx) => {
+                const isP2 = (log._p2 !== '' || log._note === 'P2') && !log._note.includes('UP');
+                const inRange = log._date >= start && log._date <= end;
+                
+                if (isP2 && inRange) {
+                    const key = (log._phone || log._normName) + log._date.getTime();
+                    if (processedP2Keys.has(key)) return;
+                    processedP2Keys.add(key);
+                    
+                    p2Targets++;
+                    let converted = false;
+                    
+                    // Look forward for conversion
+                    for (let i = idx; i < logs.length; i++) {
+                        const n = logs[i];
+                        if (n._upP1Amt > 0 || n._p1 !== '' || n._note.includes('P1')) {
+                            p1Converted++; converted = true; break;
+                        } else if (n._upP2Amt > 0 || n._note.includes('UP P2') || n._note.includes('UPP2')) {
+                            upP2Converted++; converted = true; break;
+                        }
+                    }
 
+                    if (!converted) {
+                        pendingList.push({
+                            date: log._date,
+                            name: log._name,
+                            phone: log._phone,
+                            interest: getValFlexible(log, ['รายการที่สนใจ']),
+                            sale: getValFlexible(log, ['Sale']),
+                            status: log._note || 'P2'
+                        });
+                    }
+                }
+            });
+        }
 
-    function updatePendingTable(data) {
+        // Update UI
+        document.getElementById('kpi-total-p2').innerText = p2Targets;
+        document.getElementById('kpi-all-up-p2').innerText = allUpP2Bills;
+        document.getElementById('kpi-conv-p1').innerText = p1Converted;
+        document.getElementById('kpi-conv-up').innerText = upP2Converted;
 
-        const body = document.getElementById('pendingTableBody');
+        const perc = (v) => p2Targets > 0 ? ((v/p2Targets)*100).toFixed(1) + '%' : '0%';
+        document.getElementById('perc-p1').innerText = perc(p1Converted);
+        document.getElementById('perc-up').innerText = perc(upP2Converted);
 
-        data.sort((a, b) => a.p2Date - b.p2Date);
-
-        
-
-        body.innerHTML = data.length ? data.map(row => `
-
+        updateTable('successBody', successList, r => `
             <tr>
-
-                <td>${row.p2Date.toLocaleDateString('th-TH')}</td>
-
-                <td><b>${row.name}</b></td>
-
-                <td>${row.phone}</td>
-
-                <td>${row.sale}</td>
-
-                <td style="font-size:12px; color:#666;">${row.interest}</td>
-
-                <td style="color:#0d6efd;">${row.serviceDate}</td>
-
+                <td>${r.date.toLocaleDateString('th-TH')}</td>
+                <td><b>${r.name}</b></td>
+                <td style="color:var(--purple); font-weight:600;">${r.amt.toLocaleString()}</td>
+                <td>${r.sale}</td>
             </tr>
+        `);
 
-        `).join('') : '<tr><td colspan="6" style="text-align:center; padding: 20px; color:#198754;">เยี่ยมมาก! ไม่มีงานค้างติดตาม</td></tr>';
+        updateTable('pendingBody', pendingList, r => `
+            <tr>
+                <td>${r.date.toLocaleDateString('th-TH')}</td>
+                <td><b>${r.name}</b></td>
+                <td>${r.phone || '-'}</td>
+                <td style="font-size:12px; color:var(--gray);">${r.interest || '-'}</td>
+                <td>${r.sale}</td>
+                <td><span class="badge" style="background:#eee; color:#666;">${r.status}</span></td>
+            </tr>
+        `);
+        document.getElementById('pendingCount').innerText = `${pendingList.length} รายการ`;
 
+        updateChart(p1Converted, upP2Converted, Math.max(0, p2Targets - p1Converted - upP2Converted));
     }
 
-
-
-    function clearFilters() {
-
-        document.getElementById('startDate').value = '';
-
-        document.getElementById('endDate').value = '';
-
-        applyFiltersAndAnalyze();
-
+    function updateTable(id, data, formatter) {
+        const el = document.getElementById(id);
+        if (id === 'successBody') data.sort((a,b) => b.date - a.date);
+        el.innerHTML = data.length ? data.map(formatter).join('') : '<tr><td colspan="4" style="text-align:center; padding:20px; color:#999;">ไม่พบข้อมูล</td></tr>';
     }
 
+    function updateChart(p1, up, none) {
+        const ctx = document.getElementById('convChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['เป็น P1', 'Upgrade P2', 'รอติดตาม'],
+                datasets: [{
+                    data: [p1, up, none],
+                    backgroundColor: ['#198754', '#ffc107', '#cbd5e1'],
+                    borderWidth: 0
+                }]
+            },
+            options: { maintainAspectRatio: false, cutout: '75%' }
+        });
+    }
+
+    function resetFilters() {
+        document.getElementById('branchSelector').selectedIndex = 0;
+        document.getElementById('dashboard').style.display = 'none';
+    }
 </script>
-
-
-
 </body>
-
 </html>
