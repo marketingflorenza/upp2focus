@@ -5,7 +5,8 @@ import {
   Cell, 
   ResponsiveContainer, 
   Sector,
-  Tooltip as RechartsTooltip
+  Tooltip as RechartsTooltip,
+  Legend
 } from 'recharts';
 import { 
   Search, 
@@ -47,9 +48,9 @@ const BRANCH_NAMES = {
 const COLORS = {
   target: '#0ea5e9', // Sky
   allUp: '#6366f1',   // Indigo
-  p1: '#198754',      // Green
-  upP2: '#ffc107',   // Amber
-  none: '#ef4444',   // Red (Alert for pending)
+  p1: '#10b981',      // Emerald
+  upP2: '#f59e0b',   // Amber
+  none: '#f43f5e',   // Rose (Alert for pending)
 };
 
 const renderActiveShape = (props) => {
@@ -57,26 +58,34 @@ const renderActiveShape = (props) => {
   const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
   const sin = Math.sin(-RADIAN * midAngle);
   const cos = Math.cos(-RADIAN * midAngle);
-  const sx = cx + (outerRadius + 10) * cos;
-  const sy = cy + (outerRadius + 10) * sin;
-  const mx = cx + (outerRadius + 25) * cos;
-  const my = cy + (outerRadius + 25) * sin;
-  const ex = mx + (cos >= 0 ? 1 : -1) * 22;
+  const sx = cx + (outerRadius + 6) * cos;
+  const sy = cy + (outerRadius + 6) * sin;
+  const mx = cx + (outerRadius + 20) * cos;
+  const my = cy + (outerRadius + 20) * sin;
+  const ex = mx + (cos >= 0 ? 1 : -1) * 15;
   const ey = my;
   const textAnchor = cos >= 0 ? 'start' : 'end';
 
   return (
     <g>
-      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} className="font-bold text-[10px] md:text-sm">
-        {payload.name}
+      <text x={cx} y={cy - 5} dy={8} textAnchor="middle" fill="#1e293b" className="font-black text-lg">
+        {value}
       </text>
-      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius} startAngle={startAngle} endAngle={endAngle} fill={fill} />
-      <Sector cx={cx} cy={cy} startAngle={startAngle} endAngle={endAngle} innerRadius={outerRadius + 6} outerRadius={outerRadius + 10} fill={fill} />
-      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
-      <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" className="text-xs font-bold">{`${value} ราย`}</text>
-      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={14} textAnchor={textAnchor} fill="#64748b" className="text-[10px]">
-        {`(${(percent * 100).toFixed(1)}%)`}
+      <text x={cx} y={cy + 15} dy={8} textAnchor="middle" fill="#94a3b8" className="font-bold text-[9px] uppercase tracking-tighter">
+        ราย
+      </text>
+      <Sector 
+        cx={cx} cy={cy} 
+        innerRadius={innerRadius} outerRadius={outerRadius} 
+        startAngle={startAngle} endAngle={endAngle} 
+        fill={fill} 
+        cornerRadius={4}
+      />
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" strokeWidth={2} />
+      <circle cx={ex} cy={ey} r={3} fill={fill} stroke="none" />
+      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} textAnchor={textAnchor} fill="#1e293b" className="text-[10px] font-black">{payload.name}</text>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} dy={12} textAnchor={textAnchor} fill="#64748b" className="text-[9px] font-medium">
+        {`${(percent * 100).toFixed(1)}%`}
       </text>
     </g>
   );
@@ -284,13 +293,15 @@ const App = () => {
           }
 
           if (!isConverted) {
+            const rawArrivalDate = getVal(log, 'วันที่เข้าใช้บริการ');
+            const parsedArrivalDate = parseDate(rawArrivalDate);
             pendingDetails.push({
               p2Date: log._date,
               name: log._name,
               phone: log._phone,
               sale: getVal(log, 'Sale') || '-',
               interest: getVal(log, 'รายการที่สนใจ') || '-',
-              arrivalDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-'
+              arrivalDate: parsedArrivalDate || rawArrivalDate || '-'
             });
           }
         }
@@ -407,20 +418,48 @@ const App = () => {
                 </div>
               </div>
 
+              {/* Enhanced Conversion Pie Chart */}
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-                <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2 border-b pb-2"><PieIcon size={14} /> CONVERSION</h4>
-                <div className="h-[200px] w-full">
+                <div className="flex items-center justify-between mb-4 border-b pb-2">
+                  <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    <PieIcon size={14} /> CONVERSION
+                  </h4>
+                  <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                    ALL P2
+                  </span>
+                </div>
+                <div className="h-[280px] w-full">
                   {pieData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie activeIndex={activeIndex} activeShape={renderActiveShape} data={pieData} innerRadius={45} outerRadius={60} dataKey="value" onMouseEnter={(_, index) => setActiveIndex(index)}>
+                        <Pie 
+                          activeIndex={activeIndex} 
+                          activeShape={renderActiveShape} 
+                          data={pieData} 
+                          innerRadius={55} 
+                          outerRadius={75} 
+                          dataKey="value" 
+                          onMouseEnter={(_, index) => setActiveIndex(index)}
+                          paddingAngle={2}
+                        >
                           {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />)}
                         </Pie>
-                        <RechartsTooltip />
+                        <RechartsTooltip 
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                        />
+                        <Legend 
+                          verticalAlign="bottom" 
+                          height={36} 
+                          iconType="circle"
+                          formatter={(value) => <span className="text-[10px] font-bold text-slate-600 uppercase ml-1">{value}</span>}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-300 italic text-[10px]">ไม่มีข้อมูล</div>
+                    <div className="h-full flex flex-col items-center justify-center text-slate-300 italic text-[10px] space-y-2">
+                       <PieIcon size={40} className="opacity-20" />
+                       <p>ไม่มีข้อมูลในช่วงเวลานี้</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -440,7 +479,7 @@ const App = () => {
             </div>
 
             <div className="space-y-6">
-              {/* [NEW] Pending Table Moved to Top & Separated Phone Column */}
+              {/* Pending Table */}
               <div className="bg-white rounded-2xl shadow-xl border-2 border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
                 <div className="p-4 border-b border-rose-100 flex justify-between items-center bg-rose-50/30">
                   <h3 className="font-black text-sm uppercase tracking-wider text-rose-700 flex items-center gap-2">
@@ -461,7 +500,7 @@ const App = () => {
                         <th className="p-4 font-black text-rose-800 uppercase text-[10px] bg-rose-100/50"><div className="flex items-center gap-1"><Phone size={12}/> เบอร์โทรศัพท์</div></th>
                         <th className="p-4 font-black text-rose-800 uppercase text-[10px]">รายการที่สนใจ</th>
                         <th className="p-4 font-black text-rose-800 uppercase text-[10px]">Sale ผู้ดูแล</th>
-                        <th className="p-4 font-black text-indigo-700 uppercase text-[10px]">วันที่จะเข้ามา</th>
+                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">วันที่จะเข้ามา</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-rose-100">
@@ -484,8 +523,10 @@ const App = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                             <div className="text-indigo-600 font-black flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-md w-fit">
-                                <MapPin size={10} /> {row.arrivalDate}
+                             <div className="text-slate-500 font-medium">
+                                {row.arrivalDate instanceof Date 
+                                  ? row.arrivalDate.toLocaleDateString('th-TH') 
+                                  : row.arrivalDate}
                              </div>
                           </td>
                         </tr>
