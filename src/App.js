@@ -23,7 +23,8 @@ import {
   Clock,
   Wallet,
   CheckCircle2,
-  UserCheck
+  UserCheck,
+  Phone
 } from 'lucide-react';
 
 // --- Constants & Config ---
@@ -46,9 +47,9 @@ const BRANCH_NAMES = {
 const COLORS = {
   target: '#0ea5e9', // Sky
   allUp: '#6366f1',   // Indigo
-  p1: '#198754',     // Green
+  p1: '#198754',      // Green
   upP2: '#ffc107',   // Amber
-  none: '#adb5bd',   // Grey
+  none: '#ef4444',   // Red (Alert for pending)
 };
 
 const renderActiveShape = (props) => {
@@ -185,9 +186,7 @@ const App = () => {
       
       if (!date) return;
 
-      // Identity Key: Name + Phone to avoid duplicates/splits
       const identityKey = `${phone}_${name}`;
-
       if (!userHistory[identityKey]) userHistory[identityKey] = [];
       userHistory[identityKey].push({ ...row, _date: date, _note: note, _phone: phone, _name: name });
     });
@@ -205,7 +204,6 @@ const App = () => {
     const checkedKeysP2 = new Set();
     const checkedKeysAllUp = new Set();
 
-    // LOOP A: UP P2 ALL BILLS
     for (const identityKey in userHistory) {
       userHistory[identityKey].forEach(log => {
         if (!isWithin(log._date, start, end)) return;
@@ -228,7 +226,6 @@ const App = () => {
       });
     }
 
-    // LOOP B: Conversion Funnel (P1/UP P2 Tracker)
     for (const identityKey in userHistory) {
       const logs = userHistory[identityKey].sort((a, b) => a._date - b._date);
       logs.forEach((log, idx) => {
@@ -319,7 +316,6 @@ const App = () => {
     ].filter(d => d.value > 0);
   }, [processed]);
 
-  // Filtering Logic
   const filteredUpP2 = useMemo(() => {
     if (!processed) return [];
     return processed.allUpP2SalesList.filter(s => 
@@ -349,7 +345,7 @@ const App = () => {
     <div className={`bg-white p-5 rounded-2xl border-l-4 ${colorClass} shadow-sm transition-all hover:shadow-md`}>
       <div className="flex justify-between items-start mb-2">
         <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">{title}</p>
-        <div className={`p-1.5 rounded-lg ${colorClass.replace('border-', 'bg-').replace('500', '100')}`}>
+        <div className={`p-1.5 rounded-lg ${colorClass.replace('border-', 'bg-').replace('500', '100').replace('400', '100')}`}>
           <Icon size={14} className={colorClass.replace('border-', 'text-')} />
         </div>
       </div>
@@ -433,10 +429,10 @@ const App = () => {
           <div className="lg:col-span-3 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <StatCard title="🎯 กลุ่มเป้าหมาย P2" value={processed?.stats.countP2_Targets || 0} sub="(คัดแยกชื่อ + เบอร์)" colorClass="border-sky-500" icon={Users} />
-              <StatCard title="💜 บิล UP P2 ทั้งหมด" value={processed?.stats.countTotal_UpP2_Bills || 0} sub="(นับทุกใบเสร็จ UP P2)" colorClass="border-indigo-500" icon={Wallet} />
               <StatCard title="✅ เปลี่ยนเป็น P1" value={processed?.stats.countP1_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countP1_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 to P1 Success" colorClass="border-emerald-500" icon={CheckCircle2} />
-              <StatCard title="⚠️ Upgrade UP P2" value={processed?.stats.countUpP2_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countUpP2_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 ที่เข้ามาในช่วงเวลากำหนด" colorClass="border-amber-500" icon={ArrowUpRight} />
-              <StatCard title="❌ ยังไม่เปลี่ยนสถานะ" value={processed?.stats.countNone || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countNone/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="Pending follow-up" colorClass="border-slate-400" icon={AlertCircle} />
+              <StatCard title="🚨 ค้างติดตาม P2" value={processed?.stats.countNone || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countNone/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="High Priority Follow-up" colorClass="border-rose-500" icon={AlertCircle} />
+              <StatCard title="💜 บิล UP P2 ทั้งหมด" value={processed?.stats.countTotal_UpP2_Bills || 0} sub="(นับทุกใบเสร็จ UP P2)" colorClass="border-indigo-500" icon={Wallet} />
+              <StatCard title="⚠️ Upgrade UP P2" value={processed?.stats.countUpP2_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countUpP2_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 ที่เข้ามาตามเวลากำหนด" colorClass="border-amber-500" icon={ArrowUpRight} />
               <div className="bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl text-white shadow-lg flex flex-col justify-center border-b-4 border-indigo-500">
                  <p className="text-[10px] font-black uppercase opacity-60 tracking-[2px]">Revenue (UP P2)</p>
                  <h3 className="text-3xl font-black italic tracking-tighter">฿ {(processed?.stats.totalRevenue || 0).toLocaleString()}</h3>
@@ -444,11 +440,67 @@ const App = () => {
             </div>
 
             <div className="space-y-6">
+              {/* [NEW] Pending Table Moved to Top & Separated Phone Column */}
+              <div className="bg-white rounded-2xl shadow-xl border-2 border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
+                <div className="p-4 border-b border-rose-100 flex justify-between items-center bg-rose-50/30">
+                  <h3 className="font-black text-sm uppercase tracking-wider text-rose-700 flex items-center gap-2">
+                    <AlertCircle size={18} className="animate-pulse" /> ลูกค้า P2 ที่ต้องติดตาม (ยังไม่ปิดการขาย)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black px-3 py-1 bg-rose-600 text-white rounded-full shadow-lg">
+                      {filteredPending.length} รายการที่ค้าง
+                    </span>
+                  </div>
+                </div>
+                <div className="overflow-x-auto max-h-[400px]">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-rose-50/50 sticky top-0 z-10 backdrop-blur-sm">
+                      <tr>
+                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">วันที่เป็น P2</th>
+                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">ชื่อลูกค้า</th>
+                        <th className="p-4 font-black text-rose-800 uppercase text-[10px] bg-rose-100/50"><div className="flex items-center gap-1"><Phone size={12}/> เบอร์โทรศัพท์</div></th>
+                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">รายการที่สนใจ</th>
+                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">Sale ผู้ดูแล</th>
+                        <th className="p-4 font-black text-indigo-700 uppercase text-[10px]">วันที่จะเข้ามา</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-rose-100">
+                      {filteredPending.map((row, i) => (
+                        <tr key={i} className="hover:bg-rose-50/30 transition-colors">
+                          <td className="p-4 text-slate-500 font-medium">{row.p2Date.toLocaleDateString('th-TH')}</td>
+                          <td className="p-4">
+                            <div className="font-black text-slate-800 text-sm">{row.name}</div>
+                          </td>
+                          <td className="p-4 bg-rose-50/20">
+                            <a href={`tel:${row.phone}`} className="font-mono text-sm font-black text-rose-600 hover:underline flex items-center gap-1">
+                               {row.phone}
+                            </a>
+                          </td>
+                          <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+                               <UserCheck size={12} className="text-rose-400" />
+                               {row.sale}
+                            </div>
+                          </td>
+                          <td className="p-4">
+                             <div className="text-indigo-600 font-black flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-md w-fit">
+                                <MapPin size={10} /> {row.arrivalDate}
+                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredPending.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-emerald-500 font-black text-lg">🎉 เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               {/* Table P1 Success */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50/20">
                   <h3 className="font-black text-xs uppercase tracking-widest text-emerald-700 flex items-center gap-2">
-                    <CheckCircle2 size={16} /> รายชื่อเปลี่ยนเป็น P1 สำเร็จ (ยอดจากช่อง I)
+                    <CheckCircle2 size={16} /> รายชื่อเปลี่ยนเป็น P1 สำเร็จ (Conversion)
                   </h3>
                   <span className="text-[10px] font-black px-2.5 py-1 bg-emerald-600 text-white rounded-full">
                     {filteredP1.length} รายการ
@@ -470,7 +522,7 @@ const App = () => {
                         <tr key={i} className="hover:bg-slate-50 transition-colors">
                           <td className="p-4">
                             <div className="font-bold text-slate-800">{row.name}</div>
-                            <div className="text-[10px] text-slate-400">{row.phone}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{row.phone}</div>
                           </td>
                           <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
                           <td className="p-4 font-black text-emerald-600 text-sm">฿{row.amt.toLocaleString()}</td>
@@ -478,7 +530,6 @@ const App = () => {
                           <td className="p-4"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
                         </tr>
                       ))}
-                      {filteredP1.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-300 italic font-bold">ไม่พบข้อมูล P1 ในช่วงเวลานี้</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -488,9 +539,9 @@ const App = () => {
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-50/20">
                   <h3 className="font-black text-xs uppercase tracking-widest text-indigo-700 flex items-center gap-2">
-                    <ArrowUpRight size={16} /> รายชื่อยอดขาย UP P2 ทั้งหมด
+                    <ArrowUpRight size={16} /> รายชื่อยอดขาย UP P2 ทั้งหมด (ทุกบิล)
                   </h3>
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-100">
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-600 text-white rounded-full">
                     {filteredUpP2.length} บิล
                   </span>
                 </div>
@@ -515,56 +566,6 @@ const App = () => {
                           <td className="p-4"><span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
                         </tr>
                       ))}
-                      {filteredUpP2.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-300 italic font-bold">ไม่มีรายการ UP P2 ในช่วงนี้</td></tr>}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Pending Table */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-rose-50/10">
-                  <h3 className="font-black text-xs uppercase tracking-widest text-rose-700 flex items-center gap-2">
-                    <AlertCircle size={16} /> ลูกค้า P2 ที่ต้องติดตาม (ยังไม่ปิดการขาย)
-                  </h3>
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-rose-500 text-white rounded-full shadow-lg shadow-rose-100">
-                    {filteredPending.length} รายการ
-                  </span>
-                </div>
-                <div className="overflow-x-auto max-h-[350px]">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 sticky top-0 z-10">
-                      <tr>
-                        <th className="p-4 font-black text-slate-400 uppercase">วันที่เป็น P2</th>
-                        <th className="p-4 font-black text-slate-400 uppercase">ชื่อลูกค้า / เบอร์โทร</th>
-                        <th className="p-4 font-black text-slate-400 uppercase">รายการที่สนใจ</th>
-                        <th className="p-4 font-black text-slate-400 uppercase">Sale ผู้ดูแล</th>
-                        <th className="p-4 font-black text-slate-400 uppercase text-indigo-600">วันที่จะเข้ามา</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredPending.map((row, i) => (
-                        <tr key={i} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-4 text-slate-400">{row.p2Date.toLocaleDateString('th-TH')}</td>
-                          <td className="p-4">
-                            <div className="font-bold text-slate-800">{row.name}</div>
-                            <div className="text-[10px] text-slate-400">{row.phone}</div>
-                          </td>
-                          <td className="p-4 text-slate-500 truncate max-w-[150px]">{row.interest}</td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-1.5 text-slate-600 font-bold">
-                               <UserCheck size={12} className="text-slate-400" />
-                               {row.sale}
-                            </div>
-                          </td>
-                          <td className="p-4">
-                             <div className="text-indigo-600 font-bold flex items-center gap-1">
-                                <MapPin size={10} /> {row.arrivalDate}
-                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredPending.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-emerald-500 font-bold">เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
                     </tbody>
                   </table>
                 </div>
