@@ -22,7 +22,8 @@ import {
   TrendingUp,
   Clock,
   Wallet,
-  CheckCircle2
+  CheckCircle2,
+  UserCheck
 } from 'lucide-react';
 
 // --- Constants & Config ---
@@ -184,7 +185,7 @@ const App = () => {
       
       if (!date) return;
 
-      // สร้าง Composite Key: เบอร์ + ชื่อ เพื่อแยกแยะตัวตน
+      // Identity Key: Name + Phone to avoid duplicates/splits
       const identityKey = `${phone}_${name}`;
 
       if (!userHistory[identityKey]) userHistory[identityKey] = [];
@@ -239,17 +240,15 @@ const App = () => {
           checkedKeysP2.add(dayKey);
 
           let isConverted = false;
-          // ดึงยอดบิลจากคอลัมน์ "P1" (ช่อง I)
           const p1AmtSelf = parseAmount(getVal(log, 'P1'));
           const upP2AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P2'));
 
-          // เช็คสำเร็จในแถวเดียวกัน
           if (p1AmtSelf > 0 || log._note === 'P1') {
             countP1_Converted++;
             p1SuccessList.push({
               name: log._name,
               phone: log._phone,
-              amt: p1AmtSelf, // แสดงยอดจากช่อง I
+              amt: p1AmtSelf,
               date: log._date,
               sale: getVal(log, 'Sale'),
               interest: getVal(log, 'รายการที่สนใจ'),
@@ -261,7 +260,6 @@ const App = () => {
             isConverted = true;
           }
 
-          // เช็คบันทึกถัดไป
           if (!isConverted) {
             for (let i = idx + 1; i < logs.length; i++) {
               const next = logs[i];
@@ -272,7 +270,7 @@ const App = () => {
                 p1SuccessList.push({
                   name: next._name,
                   phone: next._phone,
-                  amt: p1AmtNext, // แสดงยอดจากช่อง I
+                  amt: p1AmtNext,
                   date: next._date,
                   sale: getVal(next, 'Sale'),
                   interest: getVal(next, 'รายการที่สนใจ'),
@@ -295,7 +293,7 @@ const App = () => {
               phone: log._phone,
               sale: getVal(log, 'Sale') || '-',
               interest: getVal(log, 'รายการที่สนใจ') || '-',
-              serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-'
+              arrivalDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-'
             });
           }
         }
@@ -342,7 +340,8 @@ const App = () => {
     if (!processed) return [];
     return processed.pendingDetails.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.phone.includes(searchTerm)
+      s.phone.includes(searchTerm) ||
+      (s.sale && s.sale.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [processed, searchTerm]);
 
@@ -374,7 +373,7 @@ const App = () => {
              </div>
              <div>
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Sales & Conversion Analysis</h1>
-                <p className="text-slate-400 text-xs font-medium">Unique Identity Sync สำหรับสาขา {BRANCH_NAMES[selectedBranch]}</p>
+                <p className="text-slate-400 text-xs font-medium">Unique Identity Sync (Name + Phone) สำหรับสาขา {BRANCH_NAMES[selectedBranch]}</p>
              </div>
           </div>
           
@@ -398,11 +397,11 @@ const App = () => {
                 <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-2 border-b pb-2"><Filter size={14} /> กรองข้อมูล</h4>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 block uppercase mb-1">เริ่มต้น</label>
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">เริ่มต้น</label>
                     <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 block uppercase mb-1">สิ้นสุด</label>
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">สิ้นสุด</label>
                     <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div className="relative pt-2">
@@ -436,7 +435,7 @@ const App = () => {
               <StatCard title="🎯 กลุ่มเป้าหมาย P2" value={processed?.stats.countP2_Targets || 0} sub="(คัดแยกชื่อ + เบอร์)" colorClass="border-sky-500" icon={Users} />
               <StatCard title="💜 บิล UP P2 ทั้งหมด" value={processed?.stats.countTotal_UpP2_Bills || 0} sub="(นับทุกใบเสร็จ UP P2)" colorClass="border-indigo-500" icon={Wallet} />
               <StatCard title="✅ เปลี่ยนเป็น P1" value={processed?.stats.countP1_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countP1_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 to P1 Success" colorClass="border-emerald-500" icon={CheckCircle2} />
-              <StatCard title="⚠️ Upgrade UP P2" value={processed?.stats.countUpP2_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countUpP2_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="บิล P2 ที่เข้ามาใช้ช่วงเวลาที่เลือก" colorClass="border-amber-500" icon={ArrowUpRight} />
+              <StatCard title="⚠️ Upgrade UP P2" value={processed?.stats.countUpP2_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countUpP2_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 ที่เข้ามาในช่วงเวลากำหนด" colorClass="border-amber-500" icon={ArrowUpRight} />
               <StatCard title="❌ ยังไม่เปลี่ยนสถานะ" value={processed?.stats.countNone || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countNone/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="Pending follow-up" colorClass="border-slate-400" icon={AlertCircle} />
               <div className="bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl text-white shadow-lg flex flex-col justify-center border-b-4 border-indigo-500">
                  <p className="text-[10px] font-black uppercase opacity-60 tracking-[2px]">Revenue (UP P2)</p>
@@ -491,7 +490,7 @@ const App = () => {
                   <h3 className="font-black text-xs uppercase tracking-widest text-indigo-700 flex items-center gap-2">
                     <ArrowUpRight size={16} /> รายชื่อยอดขาย UP P2 ทั้งหมด
                   </h3>
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-600 text-white rounded-full">
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-100">
                     {filteredUpP2.length} บิล
                   </span>
                 </div>
@@ -528,15 +527,19 @@ const App = () => {
                   <h3 className="font-black text-xs uppercase tracking-widest text-rose-700 flex items-center gap-2">
                     <AlertCircle size={16} /> ลูกค้า P2 ที่ต้องติดตาม (ยังไม่ปิดการขาย)
                   </h3>
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-rose-500 text-white rounded-full shadow-lg shadow-rose-100">
+                    {filteredPending.length} รายการ
+                  </span>
                 </div>
-                <div className="overflow-x-auto max-h-[300px]">
+                <div className="overflow-x-auto max-h-[350px]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 sticky top-0 z-10">
                       <tr>
-                        <th className="p-4 font-black text-slate-400 uppercase">P2 Date</th>
-                        <th className="p-4 font-black text-slate-400 uppercase">Customer</th>
-                        <th className="p-4 font-black text-slate-400 uppercase">Interest</th>
-                        <th className="p-4 font-black text-slate-400 uppercase">Service Date</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">วันที่เป็น P2</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">ชื่อลูกค้า / เบอร์โทร</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">รายการที่สนใจ</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Sale ผู้ดูแล</th>
+                        <th className="p-4 font-black text-slate-400 uppercase text-indigo-600">วันที่จะเข้ามา</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -549,13 +552,19 @@ const App = () => {
                           </td>
                           <td className="p-4 text-slate-500 truncate max-w-[150px]">{row.interest}</td>
                           <td className="p-4">
+                            <div className="flex items-center gap-1.5 text-slate-600 font-bold">
+                               <UserCheck size={12} className="text-slate-400" />
+                               {row.sale}
+                            </div>
+                          </td>
+                          <td className="p-4">
                              <div className="text-indigo-600 font-bold flex items-center gap-1">
-                                <MapPin size={10} /> {row.serviceDate}
+                                <MapPin size={10} /> {row.arrivalDate}
                              </div>
                           </td>
                         </tr>
                       ))}
-                      {filteredPending.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-emerald-500 font-bold">เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
+                      {filteredPending.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-emerald-500 font-bold">เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
                     </tbody>
                   </table>
                 </div>
