@@ -11,3 +11,5 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+import App from './App.jsx'; // 
