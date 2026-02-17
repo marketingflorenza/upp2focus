@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2 Sales Dashboard (Target P2 to P1 Focus)</title>
+    <title>P2 Sales Dashboard (P1 Column I Focus)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -64,7 +64,6 @@
         .bg-success { background: #dcfce7; color: #166534; }
         .bg-warning { background: #fef9c3; color: #854d0e; }
         .bg-purple { background: #f3e8ff; color: #581c87; }
-        .bg-p1 { background: #cfe2ff; color: #084298; }
 
         #statusText { padding: 10px; font-size: 14px; border-radius: 8px; text-align: center; display: none; margin-bottom: 15px; }
         .status-loading { display: block !important; background: #e0f2fe; color: #0369a1; }
@@ -79,7 +78,7 @@
 <div class="container">
     <div class="header">
         <h1>Sales & Conversion Dashboard (P2 Focus)</h1>
-        <p>วิเคราะห์เป้าหมาย P2 ที่เปลี่ยนเป็นยอดชำระ P1 และ UP P2</p>
+        <p>วิเคราะห์ข้อมูลเป้าหมาย P2 ที่เปลี่ยนเป็นยอดชำระ P1 (ดึงข้อมูลช่อง I)</p>
     </div>
 
     <div class="card">
@@ -118,7 +117,7 @@
                 <div class="kpi-value" id="kpi-all-up-p2">0</div>
             </div>
             <div class="kpi-card p1-conv">
-                <div class="kpi-label">✅ เปลี่ยนเป็น P1</div>
+                <div class="kpi-label">✅ เปลี่ยนเป็น P1 (ช่อง I)</div>
                 <div class="kpi-value">
                     <span id="kpi-conv-p1">0</span>
                     <span class="kpi-sub" id="perc-p1">0%</span>
@@ -163,7 +162,7 @@
 
         <div class="card">
             <div class="table-section-title">
-                <h3 style="color: var(--success);">🏆 รายการ P1 (เฉพาะเป้าหมาย P2 ที่เปลี่ยนเป็น P1)</h3>
+                <h3 style="color: var(--success);">🏆 รายการ P1 (เฉพาะเป้าหมาย P2 ที่เปลี่ยนเป็น P1 จากช่อง I)</h3>
             </div>
             <div class="table-container" style="height: 400px;">
                 <table id="p1Table">
@@ -172,7 +171,7 @@
                             <th>วันที่ P1</th>
                             <th>ชื่อลูกค้า</th>
                             <th>รายการ</th>
-                            <th>ยอดชำระ P1</th>
+                            <th>ยอดชำระ P1 (ช่อง I)</th>
                             <th>Sale</th>
                         </tr>
                     </thead>
@@ -229,25 +228,46 @@
         return '';
     }
 
+    // ฟังก์ชันพิเศษเพื่อดึงข้อมูลจาก Column I (Index 8 ใน CSV ที่ไม่มี Header ว่างนำหน้า)
+    function getP1Value(row) {
+        // ลองหาจากชื่อก่อน
+        const val = getValFlexible(row, ['P1', 'ยอดจอง']);
+        if (val !== '') return cleanNumeric(val);
+        
+        // ถ้าหาไม่เจอ ให้ลองดึงจากตำแหน่ง Index 8 (Column I)
+        const keys = Object.keys(row);
+        if (keys.length > 8) {
+            return cleanNumeric(row[keys[8]]);
+        }
+        return 0;
+    }
+
     function robustParseDate(s) {
         if (!s) return null;
         s = s.trim();
+        let parts = s.split(/[\-\/]/);
+        if (parts.length < 3) return null;
+
+        let p1 = parseInt(parts[0]);
+        let p2 = parseInt(parts[1]);
+        let p3 = parseInt(parts[2]);
         let d, m, y;
-        if (s.includes('-')) {
-            const p = s.split('-');
-            if (p[0].length === 4) { 
-                y = parseInt(p[0]); m = parseInt(p[1]); d = parseInt(p[2]);
-            } else { 
-                d = parseInt(p[0]); m = parseInt(p[1]); y = parseInt(p[2]);
-            }
-        } else if (s.includes('/')) {
-            const p = s.split('/');
-            d = parseInt(p[0]); m = parseInt(p[1]); y = parseInt(p[2]);
-        } else { return null; }
+
+        if (p1 > 1000) { 
+            y = p1; m = p2; d = p3;
+        } else if (p1 > 12) {
+            d = p1; m = p2; y = p3;
+        } else if (p2 > 12) {
+            m = p1; d = p2; y = p3;
+        } else {
+            d = p1; m = p2; y = p3;
+        }
 
         if (y > 2500) y -= 543;
         if (y < 100) y += 2000;
-        return new Date(y, m - 1, d);
+        
+        const dt = new Date(y, m - 1, d);
+        return isNaN(dt.getTime()) ? null : dt;
     }
 
     function cleanNumeric(val) {
@@ -322,7 +342,7 @@
         let p1DisplayList = [];
         let pendingDisplayList = [];
 
-        // 1. Pre-process and index data
+        // Pre-process and index data
         rawData.forEach(row => {
             const date = robustParseDate(getValFlexible(row, ['วันที่', 'date']));
             if (!date) return;
@@ -331,8 +351,8 @@
             const phone = getValFlexible(row, ['เบอร์ติดต่อ', 'เบอร์โทร', 'phone']).trim();
             const note = getValFlexible(row, ['หมายเหตุ', 'note']).toUpperCase();
             
-            const p1Amt = cleanNumeric(getValFlexible(row, ['P1', 'ยอดจอง', 'ยอดจองมัดจำ']));
-            const upP1Amt = cleanNumeric(getValFlexible(row, ['ยอดอัพP1', 'ยอดอัพ P1']));
+            // ดึงค่า P1 จากช่อง I (Index 8)
+            const p1Amt = getP1Value(row);
             const upP2Amt = cleanNumeric(getValFlexible(row, ['ยอดอัพP2', 'ยอดอัพ P2']));
 
             const entry = {
@@ -343,7 +363,6 @@
                 _phone: phone,
                 _note: note,
                 _p1Amt: p1Amt,
-                _upP1Amt: upP1Amt,
                 _upP2Amt: upP2Amt,
                 _isP2: getValFlexible(row, ['P2']).trim() !== '' || (note === 'P2'),
                 _serviceDate: getValFlexible(row, ['วันที่เข้าใช้บริการ', 'นัดหมาย', 'วันที่เข้า'])
@@ -359,7 +378,7 @@
             }
         });
 
-        // 2. Calculate Total UP P2 Bills (Total Volume Table)
+        // Loop for UP P2 Volume
         rawData.forEach(row => {
             const d = robustParseDate(getValFlexible(row, ['วันที่']));
             if (!d || d < start || d > end) return;
@@ -379,7 +398,6 @@
             }
         });
 
-        // 3. Conversion Analysis (Target P2 -> P1/UP P2 Table Population)
         const processedP2Keys = new Set();
         
         const processLogs = (logs) => {
@@ -395,26 +413,26 @@
                     p2Targets++;
                     let converted = false;
                     
-                    // วิเคราะห์หาการซื้อหลังจากที่เป็น P2
                     for (let i = idx; i < logs.length; i++) {
                         const n = logs[i];
                         
-                        // เคสเปลี่ยนเป็น P1
-                        if (n._p1Amt > 0 || n._upP1Amt > 0 || (n._note.includes('P1') && !n._note.includes('UP'))) {
+                        // เคสเปลี่ยนเป็น P1 (เงื่อนไข: มียอดในช่อง I และต้องไม่ใช่ UP P1)
+                        const isRealP1 = n._p1Amt > 0 && !n._note.includes('UP P1');
+                        const isUpP2 = n._upP2Amt > 0 || n._note.includes('UP P2');
+
+                        if (isRealP1) {
                             p1ConvertedCount++; 
                             converted = true;
-                            // เพิ่มในตาราง P1 (เฉพาะที่เป็น P2 มาก่อน)
                             p1DisplayList.push({
                                 date: n._date,
                                 name: n._name,
                                 interest: getValFlexible(n, ['รายการที่สนใจ']),
-                                amt: n._p1Amt || n._upP1Amt,
+                                amt: n._p1Amt,
                                 sale: getValFlexible(n, ['Sale', 'เซลล์'])
                             });
                             break;
                         } 
-                        // เคสอัพเกรดเป็น UP P2
-                        else if (n._upP2Amt > 0 || n._note.includes('UP P2')) {
+                        else if (isUpP2) {
                             upP2ConvertedCount++; converted = true; 
                             break;
                         }
@@ -435,7 +453,6 @@
             });
         };
 
-        // ประมวลผลจากรายชื่อที่มีเบอร์ และตามด้วยรายชื่อที่ไม่มีเบอร์
         for(let p in usersByPhone) processLogs(usersByPhone[p].sort((a,b)=>a._date-b._date));
         for (let name in usersByName) {
             const logs = usersByName[name];
@@ -444,7 +461,6 @@
             }
         }
 
-        // 4. Update UI
         document.getElementById('kpi-total-p2').innerText = p2Targets;
         document.getElementById('kpi-all-up-p2').innerText = allUpP2BillsTotal;
         document.getElementById('kpi-conv-p1').innerText = p1ConvertedCount;
@@ -464,7 +480,6 @@
             </tr>
         `);
 
-        // ตาราง P1 จะแสดงเฉพาะรายชื่อลูกค้าที่เป็น P2 มาก่อนเท่านั้น
         updateTable('p1Body', p1DisplayList, r => `
             <tr>
                 <td>${r.date.toLocaleDateString('th-TH')}</td>
