@@ -204,7 +204,7 @@ const App = () => {
     const checkedKeysP2 = new Set();
     const checkedKeysAllUp = new Set();
 
-    // LOOP A: UP P2 ALL BILLS (นับบิล UP P2 ทั้งหมดในช่วงเวลา)
+    // LOOP A: UP P2 ALL BILLS
     for (const identityKey in userHistory) {
       userHistory[identityKey].forEach(log => {
         if (!isWithin(log._date, start, end)) return;
@@ -227,7 +227,7 @@ const App = () => {
       });
     }
 
-    // LOOP B: Conversion Funnel (นับตามตัวตนลูกค้าที่เป็น P2 ครั้งแรก)
+    // LOOP B: Conversion Funnel (P1/UP P2 Tracker)
     for (const identityKey in userHistory) {
       const logs = userHistory[identityKey].sort((a, b) => a._date - b._date);
       logs.forEach((log, idx) => {
@@ -239,16 +239,17 @@ const App = () => {
           checkedKeysP2.add(dayKey);
 
           let isConverted = false;
-          const p1AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P1'));
+          // ดึงยอดบิลจากคอลัมน์ "P1" (ช่อง I)
+          const p1AmtSelf = parseAmount(getVal(log, 'P1'));
           const upP2AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P2'));
 
-          // เช็คว่าสำเร็จในบรรทัดเดียวกันเลยหรือไม่
+          // เช็คสำเร็จในแถวเดียวกัน
           if (p1AmtSelf > 0 || log._note === 'P1') {
             countP1_Converted++;
             p1SuccessList.push({
               name: log._name,
               phone: log._phone,
-              amt: p1AmtSelf,
+              amt: p1AmtSelf, // แสดงยอดจากช่อง I
               date: log._date,
               sale: getVal(log, 'Sale'),
               interest: getVal(log, 'รายการที่สนใจ'),
@@ -260,18 +261,18 @@ const App = () => {
             isConverted = true;
           }
 
-          // ถ้ายังไม่สำเร็จในบรรทัด P2 ให้เช็คบันทึกถัดไปของลูกค้าคนเดิม
+          // เช็คบันทึกถัดไป
           if (!isConverted) {
             for (let i = idx + 1; i < logs.length; i++) {
               const next = logs[i];
-              const p1AmtNext = parseAmount(getVal(next, 'ยอดอัพ P1'));
+              const p1AmtNext = parseAmount(getVal(next, 'P1'));
               const upP2AmtNext = parseAmount(getVal(next, 'ยอดอัพ P2'));
               if (next._note === 'P1' || p1AmtNext > 0) {
                 countP1_Converted++;
                 p1SuccessList.push({
                   name: next._name,
                   phone: next._phone,
-                  amt: p1AmtNext,
+                  amt: p1AmtNext, // แสดงยอดจากช่อง I
                   date: next._date,
                   sale: getVal(next, 'Sale'),
                   interest: getVal(next, 'รายการที่สนใจ'),
@@ -325,7 +326,7 @@ const App = () => {
     if (!processed) return [];
     return processed.allUpP2SalesList.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.sale.toLowerCase().includes(searchTerm.toLowerCase())
+      (s.sale && s.sale.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [processed, searchTerm]);
 
@@ -333,7 +334,7 @@ const App = () => {
     if (!processed) return [];
     return processed.p1SuccessList.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.sale.toLowerCase().includes(searchTerm.toLowerCase())
+      (s.sale && s.sale.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [processed, searchTerm]);
 
@@ -372,8 +373,8 @@ const App = () => {
                 <TrendingUp size={28} />
              </div>
              <div>
-                <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Sales & Conversion</h1>
-                <p className="text-slate-400 text-xs font-medium">Unique Identity Sync (Name + Phone) สำหรับสาขา {BRANCH_NAMES[selectedBranch]}</p>
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Sales & Conversion Analysis</h1>
+                <p className="text-slate-400 text-xs font-medium">Unique Identity Sync สำหรับสาขา {BRANCH_NAMES[selectedBranch]}</p>
              </div>
           </div>
           
@@ -392,17 +393,16 @@ const App = () => {
         </header>
 
         <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Filters Area */}
           <div className="lg:col-span-1 space-y-4">
               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
                 <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-2 border-b pb-2"><Filter size={14} /> กรองข้อมูล</h4>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">เริ่มต้น</label>
+                    <label className="text-[10px] font-black text-slate-400 block uppercase mb-1">เริ่มต้น</label>
                     <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">สิ้นสุด</label>
+                    <label className="text-[10px] font-black text-slate-400 block uppercase mb-1">สิ้นสุด</label>
                     <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
                   </div>
                   <div className="relative pt-2">
@@ -425,19 +425,18 @@ const App = () => {
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-300 italic text-[10px]">ไม่มีข้อมูลในช่วงเวลานี้</div>
+                    <div className="h-full flex flex-col items-center justify-center text-slate-300 italic text-[10px]">ไม่มีข้อมูล</div>
                   )}
                 </div>
               </div>
           </div>
 
           <div className="lg:col-span-3 space-y-6">
-            {/* KPI Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <StatCard title="🎯 กลุ่มเป้าหมาย P2" value={processed?.stats.countP2_Targets || 0} sub="(คัดแยกชื่อ + เบอร์)" colorClass="border-sky-500" icon={Users} />
               <StatCard title="💜 บิล UP P2 ทั้งหมด" value={processed?.stats.countTotal_UpP2_Bills || 0} sub="(นับทุกใบเสร็จ UP P2)" colorClass="border-indigo-500" icon={Wallet} />
               <StatCard title="✅ เปลี่ยนเป็น P1" value={processed?.stats.countP1_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countP1_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 to P1 Success" colorClass="border-emerald-500" icon={CheckCircle2} />
-              <StatCard title="⚠️ Upgrade UP P2" value={processed?.stats.countUpP2_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countUpP2_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="นับ P2 ในช่วงเวลาที่กำหนด" colorClass="border-amber-500" icon={ArrowUpRight} />
+              <StatCard title="⚠️ Upgrade UP P2" value={processed?.stats.countUpP2_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countUpP2_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 Upgrade success" colorClass="border-amber-500" icon={ArrowUpRight} />
               <StatCard title="❌ ยังไม่เปลี่ยนสถานะ" value={processed?.stats.countNone || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countNone/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="Pending follow-up" colorClass="border-slate-400" icon={AlertCircle} />
               <div className="bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl text-white shadow-lg flex flex-col justify-center border-b-4 border-indigo-500">
                  <p className="text-[10px] font-black uppercase opacity-60 tracking-[2px]">Revenue (UP P2)</p>
@@ -445,14 +444,12 @@ const App = () => {
               </div>
             </div>
 
-            {/* Tables Section */}
             <div className="space-y-6">
-              
               {/* Table P1 Success */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50/20">
                   <h3 className="font-black text-xs uppercase tracking-widest text-emerald-700 flex items-center gap-2">
-                    <CheckCircle2 size={16} /> รายชื่อเปลี่ยนเป็น P1 สำเร็จ
+                    <CheckCircle2 size={16} /> รายชื่อเปลี่ยนเป็น P1 สำเร็จ (ยอดจากช่อง I)
                   </h3>
                   <span className="text-[10px] font-black px-2.5 py-1 bg-emerald-600 text-white rounded-full">
                     {filteredP1.length} รายการ
@@ -464,7 +461,7 @@ const App = () => {
                       <tr>
                         <th className="p-4 font-black text-slate-400 uppercase">Customer</th>
                         <th className="p-4 font-black text-slate-400 uppercase">Interest</th>
-                        <th className="p-4 font-black text-slate-400 uppercase">Amount (P1)</th>
+                        <th className="p-4 font-black text-slate-400 uppercase text-emerald-700">Amount (P1)</th>
                         <th className="p-4 font-black text-slate-400 uppercase">Date</th>
                         <th className="p-4 font-black text-slate-400 uppercase">Sale</th>
                       </tr>
@@ -477,7 +474,7 @@ const App = () => {
                             <div className="text-[10px] text-slate-400">{row.phone}</div>
                           </td>
                           <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
-                          <td className="p-4 font-black text-emerald-600">฿{row.amt.toLocaleString()}</td>
+                          <td className="p-4 font-black text-emerald-600 text-sm">฿{row.amt.toLocaleString()}</td>
                           <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH')}</td>
                           <td className="p-4"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
                         </tr>
@@ -494,7 +491,7 @@ const App = () => {
                   <h3 className="font-black text-xs uppercase tracking-widest text-indigo-700 flex items-center gap-2">
                     <ArrowUpRight size={16} /> รายชื่อยอดขาย UP P2 ทั้งหมด
                   </h3>
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-100">
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-600 text-white rounded-full">
                     {filteredUpP2.length} บิล
                   </span>
                 </div>
@@ -514,7 +511,7 @@ const App = () => {
                         <tr key={i} className="hover:bg-slate-50 transition-colors">
                           <td className="p-4 font-bold text-slate-800">{row.name}</td>
                           <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
-                          <td className="p-4 font-black text-indigo-600">฿{row.amt.toLocaleString()}</td>
+                          <td className="p-4 font-black text-indigo-600 text-sm">฿{row.amt.toLocaleString()}</td>
                           <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH')}</td>
                           <td className="p-4"><span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
                         </tr>
@@ -531,9 +528,6 @@ const App = () => {
                   <h3 className="font-black text-xs uppercase tracking-widest text-rose-700 flex items-center gap-2">
                     <AlertCircle size={16} /> ลูกค้า P2 ที่ต้องติดตาม (ยังไม่ปิดการขาย)
                   </h3>
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-rose-500 text-white rounded-full">
-                    {filteredPending.length} รายการ
-                  </span>
                 </div>
                 <div className="overflow-x-auto max-h-[300px]">
                   <table className="w-full text-left text-xs">
@@ -566,7 +560,6 @@ const App = () => {
                   </table>
                 </div>
               </div>
-
             </div>
           </div>
         </section>
@@ -581,18 +574,6 @@ const App = () => {
         <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-50 flex flex-col items-center justify-center">
           <div className="w-12 h-12 border-[3px] border-indigo-600 border-t-transparent rounded-full animate-spin mb-4 shadow-xl"></div>
           <p className="text-indigo-700 font-black text-xs tracking-[4px] uppercase animate-pulse">Syncing Engine...</p>
-        </div>
-      )}
-      
-      {/* Error Notification */}
-      {error && (
-        <div className="fixed bottom-6 right-6 bg-rose-600 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 border border-rose-500 z-[60]">
-          <AlertCircle size={20} />
-          <div>
-            <p className="font-black text-sm uppercase">Sync Error</p>
-            <p className="text-[10px] opacity-80">{error}</p>
-          </div>
-          <button onClick={() => setError(null)} className="ml-4 hover:scale-110 transition-transform font-bold">&times;</button>
         </div>
       )}
     </div>
