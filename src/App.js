@@ -1,23 +1,15 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Sector
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Sector,
+  Tooltip as RechartsTooltip
 } from 'recharts';
 import { 
   Search, 
-  Download, 
   RefreshCw, 
-  Calendar, 
   Users, 
   CheckCircle, 
   AlertCircle, 
@@ -26,7 +18,11 @@ import {
   MapPin,
   ChevronDown,
   Tag,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  TrendingUp,
+  Clock,
+  Wallet,
+  CheckCircle2
 } from 'lucide-react';
 
 // --- Constants & Config ---
@@ -47,13 +43,13 @@ const BRANCH_NAMES = {
 };
 
 const COLORS = {
-  p1: '#10b981',    // Emerald 500
-  upP2: '#f59e0b',  // Amber 500
-  none: '#ef4444',  // Red 500 (ให้เด่นขึ้นในกรณีค้างติดตาม)
-  total: '#6366f1'  // Indigo 500
+  target: '#0ea5e9', // Sky
+  allUp: '#6366f1',   // Indigo
+  p1: '#198754',     // Green
+  upP2: '#ffc107',   // Amber
+  none: '#adb5bd',   // Grey
 };
 
-// --- Custom Active Shape for Pie ---
 const renderActiveShape = (props) => {
   const RADIAN = Math.PI / 180;
   const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
@@ -69,27 +65,11 @@ const renderActiveShape = (props) => {
 
   return (
     <g>
-      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} className="font-bold text-sm">
+      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} className="font-bold text-[10px] md:text-sm">
         {payload.name}
       </text>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-      />
-      <Sector
-        cx={cx}
-        cy={cy}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        innerRadius={outerRadius + 6}
-        outerRadius={outerRadius + 10}
-        fill={fill}
-      />
+      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius} startAngle={startAngle} endAngle={endAngle} fill={fill} />
+      <Sector cx={cx} cy={cy} startAngle={startAngle} endAngle={endAngle} innerRadius={outerRadius + 6} outerRadius={outerRadius + 10} fill={fill} />
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
       <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
       <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" className="text-xs font-bold">{`${value} ราย`}</text>
@@ -101,7 +81,7 @@ const renderActiveShape = (props) => {
 };
 
 const App = () => {
-  const [selectedBranch, setSelectedBranch] = useState('Choc');
+  const [selectedBranch, setSelectedBranch] = useState('Bangyai');
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -113,20 +93,70 @@ const App = () => {
     end: new Date().toISOString().split('T')[0]
   });
 
+  // --- Logic Helpers ---
+  const parseDate = (s) => {
+    if (!s) return null;
+    const parts = s.split(/[\/\-\.]/);
+    if (parts.length < 3) return null;
+    let p0 = parseInt(parts[0]);
+    let p1 = parseInt(parts[1]);
+    let p2 = parseInt(parts[2]);
+    let d, m, y;
+    if (p1 > 12) { m = p0; d = p1; y = p2; } else { m = p0; d = p1; y = p2; }
+    if (y > 2500) y -= 543;
+    if (y < 100) y += 2000;
+    return new Date(y, m - 1, d);
+  };
+
+  const getVal = (row, keyName) => {
+    if (!row) return '';
+    if (row[keyName] !== undefined) return row[keyName];
+    const target = keyName.replace(/\s+/g, '').toLowerCase();
+    for (let k in row) {
+      if (k.replace(/\s+/g, '').toLowerCase() === target) return row[k];
+    }
+    return '';
+  };
+
+  const parseAmount = (str) => {
+    if (!str) return 0;
+    if (typeof str !== 'string') str = String(str);
+    return parseFloat(str.replace(/,/g, '')) || 0;
+  };
+
+  const isWithin = (d, s, e) => {
+    if (!d) return false;
+    if (s && d < s) return false;
+    if (e && d > e) return false;
+    return true;
+  };
+
   // --- Data Fetching ---
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     const id = SHEETS[selectedBranch];
-    const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
+    const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Sum`;
 
     try {
       const response = await fetch(url);
+      if (!response.ok) throw new Error("Network Response Error");
       const text = await response.text();
-      const parsed = parseCSV(text);
+      
+      const lines = text.split('\n');
+      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+      const parsed = lines.slice(1).map(line => {
+        const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+        const obj = {};
+        headers.forEach((h, i) => {
+          obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '';
+        });
+        return obj;
+      });
+      
       setRawData(parsed);
     } catch (err) {
-      setError("ไม่สามารถดึงข้อมูลได้ กรุณาตรวจสอบการแชร์ Google Sheet หรือการเชื่อมต่ออินเทอร์เน็ต");
+      setError("ไม่สามารถโหลดข้อมูลได้ ตรวจสอบการแชร์ของ Google Sheet");
     } finally {
       setLoading(false);
     }
@@ -136,227 +166,198 @@ const App = () => {
     fetchData();
   }, [selectedBranch]);
 
-  // --- Helper Functions ---
-  const parseCSV = (text) => {
-    if (!text) return [];
-    const lines = text.split('\n').filter(l => l.trim() !== '');
-    if (lines.length === 0) return [];
-    
-    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-    return lines.slice(1).map(line => {
-      const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-      const obj = {};
-      headers.forEach((h, i) => {
-        obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '';
-      });
-      return obj;
-    });
-  };
-
-  const parseDate = (s) => {
-    if (!s) return null;
-    const parts = s.split(/[\/\-\.]/);
-    if (parts.length < 3) return null;
-    
-    let d, m, y;
-    // Handle formats like DD/MM/YYYY or YYYY-MM-DD
-    if (parts[0].length === 4) {
-      y = parseInt(parts[0]);
-      m = parseInt(parts[1]);
-      d = parseInt(parts[2]);
-    } else {
-      d = parseInt(parts[0]);
-      m = parseInt(parts[1]);
-      y = parseInt(parts[2]);
-    }
-
-    if (m > 12) [d, m] = [m, d]; 
-    if (y > 2500) y -= 543; // Buddhist to Gregorian
-    if (y < 100) y += 2000;
-    
-    const date = new Date(y, m - 1, d);
-    return isNaN(date.getTime()) ? null : date;
-  };
-
-  const getVal = (row, keyName) => {
-    if (!row) return '';
-    // Exact match
-    if (row[keyName] !== undefined) return row[keyName];
-    // Normalized match (ignore spaces and case)
-    const target = keyName.replace(/\s+/g, '').toLowerCase();
-    for (let k in row) {
-      if (k.replace(/\s+/g, '').toLowerCase() === target) return row[k];
-    }
-    return '';
-  };
-
-  const parseAmount = (val) => {
-    if (!val || val === '') return 0;
-    const cleaned = String(val).replace(/[^0-9.-]+/g, '');
-    return parseFloat(cleaned) || 0;
-  };
-
-  // --- Data Processing ---
+  // --- Processing ---
   const processed = useMemo(() => {
     if (!rawData.length) return null;
 
-    const start = new Date(dateRange.start);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(dateRange.end);
-    end.setHours(23, 59, 59, 999);
+    const start = dateRange.start ? new Date(dateRange.start) : null;
+    const end = dateRange.end ? new Date(dateRange.end) : null;
+    if (start) start.setHours(0, 0, 0, 0);
+    if (end) end.setHours(23, 59, 59, 999);
 
     const userHistory = {};
     rawData.forEach(row => {
-      const phone = getVal(row, 'เบอร์ติดต่อ')?.trim();
-      const dateStr = getVal(row, 'วันที่');
-      const date = parseDate(dateStr);
+      const phone = getVal(row, 'เบอร์ติดต่อ')?.trim() || 'NoPhone';
+      const name = getVal(row, 'ชื่อลูกค้า')?.trim() || 'NoName';
+      const date = parseDate(getVal(row, 'วันที่'));
+      const note = getVal(row, 'หมายเหตุ')?.trim().toUpperCase();
       
-      if (!phone || !date) return;
-      if (!userHistory[phone]) userHistory[phone] = [];
-      userHistory[phone].push({ ...row, _date: date });
+      if (!date) return;
+
+      // สร้าง Composite Key: เบอร์ + ชื่อ เพื่อแยกแยะตัวตน
+      const identityKey = `${phone}_${name}`;
+
+      if (!userHistory[identityKey]) userHistory[identityKey] = [];
+      userHistory[identityKey].push({ ...row, _date: date, _note: note, _phone: phone, _name: name });
     });
 
-    let stats = {
-      targetP2: 0,
-      convP1: 0,
-      convUpP2: 0,
-      totalUpP2Bills: 0,
-      totalRevenue: 0
-    };
+    let countP2_Targets = 0;
+    let countP1_Converted = 0;
+    let countUpP2_Converted = 0;
+    let countTotal_UpP2_Bills = 0;
+    let totalRevenue = 0;
 
-    const successList = [];
-    const pendingList = [];
-    const checkedP2Keys = new Set();
-    const checkedUpKeys = new Set();
+    const allUpP2SalesList = [];
+    const p1SuccessList = [];
+    const pendingDetails = [];
+    
+    const checkedKeysP2 = new Set();
+    const checkedKeysAllUp = new Set();
 
-    // Loop through all history to find success and funnel targets
-    for (const phone in userHistory) {
-      const logs = userHistory[phone].sort((a, b) => a._date - b._date);
-      
+    // LOOP A: UP P2 ALL BILLS (นับบิล UP P2 ทั้งหมดในช่วงเวลา)
+    for (const identityKey in userHistory) {
+      userHistory[identityKey].forEach(log => {
+        if (!isWithin(log._date, start, end)) return;
+        const dayKey = `${identityKey}_${log._date.getTime()}`;
+        const amtUpP2 = parseAmount(getVal(log, 'ยอดอัพ P2'));
+
+        if ((log._note === 'UP P2' || amtUpP2 > 0) && !checkedKeysAllUp.has(dayKey)) {
+          countTotal_UpP2_Bills++;
+          totalRevenue += amtUpP2;
+          checkedKeysAllUp.add(dayKey);
+          allUpP2SalesList.push({
+            name: log._name,
+            status: 'UP P2',
+            amt: amtUpP2,
+            date: log._date,
+            sale: getVal(log, 'Sale'),
+            interest: getVal(log, 'รายการที่สนใจ')
+          });
+        }
+      });
+    }
+
+    // LOOP B: Conversion Funnel (นับตามตัวตนลูกค้าที่เป็น P2 ครั้งแรก)
+    for (const identityKey in userHistory) {
+      const logs = userHistory[identityKey].sort((a, b) => a._date - b._date);
       logs.forEach((log, idx) => {
-        const isCurrentRange = log._date >= start && log._date <= end;
-        
-        // 1. Check Success (UP P2) for current range
-        if (isCurrentRange) {
-          const amt = parseAmount(getVal(log, 'ยอดอัพ P2'));
-          const note = getVal(log, 'หมายเหตุ')?.toUpperCase();
-          const key = `${phone}_${log._date.getTime()}`;
+        if (!isWithin(log._date, start, end)) return;
+        const dayKey = `${identityKey}_${log._date.getTime()}`;
 
-          if ((note === 'UP P2' || amt > 0) && !checkedUpKeys.has(key)) {
-            stats.totalUpP2Bills++;
-            stats.totalRevenue += amt;
-            checkedUpKeys.add(key);
-            successList.push({
-              name: getVal(log, 'ชื่อลูกค้า'),
-              phone: phone,
-              item: getVal(log, 'รายการที่สนใจ'),
-              amount: amt,
+        if (log._note === 'P2' && !checkedKeysP2.has(dayKey)) {
+          countP2_Targets++;
+          checkedKeysP2.add(dayKey);
+
+          let isConverted = false;
+          const p1AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P1'));
+          const upP2AmtSelf = parseAmount(getVal(log, 'ยอดอัพ P2'));
+
+          // เช็คว่าสำเร็จในบรรทัดเดียวกันเลยหรือไม่
+          if (p1AmtSelf > 0 || log._note === 'P1') {
+            countP1_Converted++;
+            p1SuccessList.push({
+              name: log._name,
+              phone: log._phone,
+              amt: p1AmtSelf,
               date: log._date,
               sale: getVal(log, 'Sale'),
-              status: 'UP P2'
+              interest: getVal(log, 'รายการที่สนใจ'),
+              p2Date: log._date
             });
+            isConverted = true;
+          } else if (upP2AmtSelf > 0) {
+            countUpP2_Converted++;
+            isConverted = true;
           }
-        }
 
-        // 2. Check P2 Funnel targets
-        if (isCurrentRange) {
-          const note = getVal(log, 'หมายเหตุ')?.toUpperCase();
-          const p2Col = getVal(log, 'P2');
-          const key = `${phone}_${log._date.getTime()}`;
-
-          if ((note === 'P2' || p2Col === '1' || p2Col === 1) && !checkedP2Keys.has(key)) {
-            stats.targetP2++;
-            checkedP2Keys.add(key);
-
-            let converted = false;
-            // Immediate conversion
-            if (parseAmount(getVal(log, 'ยอดอัพ P1')) > 0) {
-              stats.convP1++;
-              converted = true;
-            } else if (parseAmount(getVal(log, 'ยอดอัพ P2')) > 0) {
-              stats.convUpP2++;
-              converted = true;
-            }
-
-            // Future conversion lookup
-            if (!converted) {
-              for (let i = idx + 1; i < logs.length; i++) {
-                const next = logs[i];
-                const nextP1 = parseAmount(getVal(next, 'ยอดอัพ P1'));
-                const nextUp = parseAmount(getVal(next, 'ยอดอัพ P2'));
-                const nextNote = getVal(next, 'หมายเหตุ')?.toUpperCase();
-
-                if (nextNote === 'P1' || nextP1 > 0) {
-                  stats.convP1++;
-                  converted = true;
-                  break;
-                } else if (nextNote === 'UP P2' || nextUp > 0) {
-                  stats.convUpP2++;
-                  converted = true;
-                  break;
-                }
+          // ถ้ายังไม่สำเร็จในบรรทัด P2 ให้เช็คบันทึกถัดไปของลูกค้าคนเดิม
+          if (!isConverted) {
+            for (let i = idx + 1; i < logs.length; i++) {
+              const next = logs[i];
+              const p1AmtNext = parseAmount(getVal(next, 'ยอดอัพ P1'));
+              const upP2AmtNext = parseAmount(getVal(next, 'ยอดอัพ P2'));
+              if (next._note === 'P1' || p1AmtNext > 0) {
+                countP1_Converted++;
+                p1SuccessList.push({
+                  name: next._name,
+                  phone: next._phone,
+                  amt: p1AmtNext,
+                  date: next._date,
+                  sale: getVal(next, 'Sale'),
+                  interest: getVal(next, 'รายการที่สนใจ'),
+                  p2Date: log._date
+                });
+                isConverted = true;
+                break;
+              } else if (next._note === 'UP P2' || upP2AmtNext > 0) {
+                countUpP2_Converted++;
+                isConverted = true;
+                break;
               }
             }
+          }
 
-            if (!converted) {
-              pendingList.push({
-                date: log._date,
-                name: getVal(log, 'ชื่อลูกค้า'),
-                phone: phone,
-                sale: getVal(log, 'Sale') || '-',
-                interest: getVal(log, 'รายการที่สนใจ') || '-',
-                serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || 'ยังไม่มีระบุ'
-              });
-            }
+          if (!isConverted) {
+            pendingDetails.push({
+              p2Date: log._date,
+              name: log._name,
+              phone: log._phone,
+              sale: getVal(log, 'Sale') || '-',
+              interest: getVal(log, 'รายการที่สนใจ') || '-',
+              serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || '-'
+            });
           }
         }
       });
     }
 
-    return { stats, successList, pendingList };
+    const countNone = Math.max(0, countP2_Targets - (countP1_Converted + countUpP2_Converted));
+
+    return { 
+      stats: { countP2_Targets, countTotal_UpP2_Bills, countP1_Converted, countUpP2_Converted, countNone, totalRevenue },
+      allUpP2SalesList,
+      p1SuccessList,
+      pendingDetails
+    };
   }, [rawData, dateRange]);
 
   const pieData = useMemo(() => {
-    if (!processed || processed.stats.targetP2 === 0) return [];
-    const noneCount = Math.max(0, processed.stats.targetP2 - (processed.stats.convP1 + processed.stats.convUpP2));
-    
+    if (!processed || processed.stats.countP2_Targets === 0) return [];
     return [
-      { name: 'เปลี่ยนเป็น P1', value: processed.stats.convP1, color: COLORS.p1 },
-      { name: 'อัพเกรด UP P2', value: processed.stats.convUpP2, color: COLORS.upP2 },
-      { name: 'ค้างติดตาม', value: noneCount, color: COLORS.none }
+      { name: 'เปลี่ยนเป็น P1', value: processed.stats.countP1_Converted, color: COLORS.p1 },
+      { name: 'อัพเกรด UP P2', value: processed.stats.countUpP2_Converted, color: COLORS.upP2 },
+      { name: 'ค้างติดตาม', value: processed.stats.countNone, color: COLORS.none }
     ].filter(d => d.value > 0);
   }, [processed]);
 
-  const filteredSuccess = useMemo(() => {
+  // Filtering Logic
+  const filteredUpP2 = useMemo(() => {
     if (!processed) return [];
-    return processed.successList.filter(item => 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      item.phone.includes(searchTerm) ||
-      item.sale.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.item.toLowerCase().includes(searchTerm.toLowerCase())
+    return processed.allUpP2SalesList.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.sale.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [processed, searchTerm]);
+
+  const filteredP1 = useMemo(() => {
+    if (!processed) return [];
+    return processed.p1SuccessList.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.sale.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [processed, searchTerm]);
 
   const filteredPending = useMemo(() => {
     if (!processed) return [];
-    return processed.pendingList.filter(item => 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      item.phone.includes(searchTerm) ||
-      item.sale.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.interest.toLowerCase().includes(searchTerm.toLowerCase())
+    return processed.pendingDetails.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.phone.includes(searchTerm)
     );
   }, [processed, searchTerm]);
 
-  const StatCard = ({ title, value, sub, colorClass, icon: Icon }) => (
-    <div className={`bg-white p-6 rounded-2xl border-l-4 ${colorClass} shadow-sm transition-all hover:shadow-md hover:scale-[1.01]`}>
+  const StatCard = ({ title, value, colorClass, sub, icon: Icon, percent }) => (
+    <div className={`bg-white p-5 rounded-2xl border-l-4 ${colorClass} shadow-sm transition-all hover:shadow-md`}>
       <div className="flex justify-between items-start mb-2">
-        <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">{title}</p>
-        <div className={`p-2 rounded-lg opacity-80 ${colorClass.replace('border-', 'bg-')}`}>
-          <Icon size={16} className="text-white" />
+        <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider">{title}</p>
+        <div className={`p-1.5 rounded-lg ${colorClass.replace('border-', 'bg-').replace('500', '100')}`}>
+          <Icon size={14} className={colorClass.replace('border-', 'text-')} />
         </div>
       </div>
-      <h3 className="text-2xl font-black text-slate-800 tracking-tight">{value}</h3>
-      <p className="text-[10px] text-slate-400 mt-1 font-semibold">{sub}</p>
+      <div className="flex items-baseline gap-2">
+        <h3 className="text-2xl font-black text-slate-800">{value}</h3>
+        {percent && <span className="text-xs font-bold text-emerald-600">{percent}</span>}
+      </div>
+      <p className="text-[10px] text-slate-400 mt-1 font-medium italic">{sub}</p>
     </div>
   );
 
@@ -364,220 +365,161 @@ const App = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header Section */}
+        {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div>
-            <h1 className="text-2xl font-black flex items-center gap-2 text-indigo-800">
-              <span className="bg-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-indigo-100">
-                <ArrowUpRight size={24} />
-              </span>
-              P2 Sales Analysis Pro
-            </h1>
-            <p className="text-slate-400 text-xs mt-1 font-medium italic">Tracking real-time conversion & sales performance</p>
+          <div className="flex items-center gap-4">
+             <div className="bg-indigo-600 text-white p-3 rounded-xl shadow-lg shadow-indigo-100">
+                <TrendingUp size={28} />
+             </div>
+             <div>
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Sales & Conversion</h1>
+                <p className="text-slate-400 text-xs font-medium">Unique Identity Sync (Name + Phone) สำหรับสาขา {BRANCH_NAMES[selectedBranch]}</p>
+             </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">BRANCH:</span>
-              <div className="relative">
-                <select 
-                  value={selectedBranch}
-                  onChange={(e) => setSelectedBranch(e.target.value)}
-                  className="appearance-none bg-slate-100 border-none rounded-xl pl-4 pr-10 py-2.5 text-xs font-black text-indigo-700 ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all outline-none cursor-pointer hover:bg-slate-200"
-                >
-                  {Object.entries(BRANCH_NAMES).map(([key, name]) => (
-                    <option key={key} value={key}>{name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
-              </div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase">เลือกสาขา:</span>
+              <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
+                className="bg-slate-100 border-none rounded-lg px-3 py-2 text-xs font-bold text-indigo-700 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500">
+                {Object.entries(BRANCH_NAMES).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+              </select>
             </div>
-            
-            <button 
-              onClick={fetchData} 
-              className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 shadow-sm"
-              title="รีเฟรชข้อมูล"
-            >
-              <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-bold text-sm shadow-md" disabled={loading}>
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> {loading ? "โหลด..." : "โหลดข้อมูล"}
             </button>
           </div>
         </header>
 
-        {/* Filters & KPI Grid */}
         <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Filters Area */}
           <div className="lg:col-span-1 space-y-4">
-             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-               <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-slate-500"><Filter size={14} /> FILTER ENGINE</h4>
-               <div className="space-y-3">
-                 <div>
-                   <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">Start Date</label>
-                   <input 
-                    type="date" 
-                    value={dateRange.start}
-                    onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))}
-                    className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-xs ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                   />
-                 </div>
-                 <div>
-                   <label className="text-[10px] font-bold text-slate-400 mb-1 block uppercase">End Date</label>
-                   <input 
-                    type="date" 
-                    value={dateRange.end}
-                    onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))}
-                    className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-xs ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
-                   />
-                 </div>
-               </div>
-               <div className="pt-2">
-                 <div className="relative">
-                   <Search size={14} className="absolute left-3 top-3 text-slate-400" />
-                   <input 
-                    type="text" 
-                    placeholder="ค้นหาชื่อ/เบอร์/Sale..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-slate-50 border-none rounded-xl pl-9 pr-4 py-2.5 text-xs ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                   />
-                 </div>
-               </div>
-             </div>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-2 border-b pb-2"><Filter size={14} /> กรองข้อมูล</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">เริ่มต้น</label>
+                    <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block uppercase mb-1">สิ้นสุด</label>
+                    <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))} className="w-full bg-slate-50 border-none rounded-lg p-2 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div className="relative pt-2">
+                    <Search size={14} className="absolute left-3 top-5 text-slate-400" />
+                    <input type="text" placeholder="ค้นหาชื่อ/เบอร์/Sale..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-50 border-none rounded-lg pl-9 pr-4 py-2.5 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+              </div>
 
-             {/* Pie Chart Analysis Section */}
-             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-               <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-slate-500 mb-4"><PieIcon size={14} className="text-indigo-500" /> CONVERSION RATE</h4>
-               {pieData.length > 0 ? (
-                 <>
-                   <div className="h-[250px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            activeIndex={activeIndex}
-                            activeShape={renderActiveShape}
-                            data={pieData}
-                            innerRadius={55}
-                            outerRadius={75}
-                            dataKey="value"
-                            onMouseEnter={(_, index) => setActiveIndex(index)}
-                          >
-                            {pieData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                            ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                   </div>
-                   <div className="mt-4 grid grid-cols-1 gap-2">
-                      {pieData.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                            <span className="text-[10px] font-bold text-slate-600 uppercase">{item.name}</span>
-                          </div>
-                          <span className="text-[11px] font-black text-slate-800">{item.value} <small className="text-slate-400 font-normal tracking-normal">ราย</small></span>
-                        </div>
-                      ))}
-                   </div>
-                 </>
-               ) : (
-                 <div className="h-[250px] flex flex-col items-center justify-center text-slate-300 space-y-2 italic">
-                   <AlertCircle size={32} />
-                   <p className="text-[10px] font-bold uppercase tracking-widest">No Data in Range</p>
-                 </div>
-               )}
-             </div>
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2 border-b pb-2"><PieIcon size={14} /> CONVERSION</h4>
+                <div className="h-[200px] w-full">
+                  {pieData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie activeIndex={activeIndex} activeShape={renderActiveShape} data={pieData} innerRadius={45} outerRadius={60} dataKey="value" onMouseEnter={(_, index) => setActiveIndex(index)}>
+                          {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />)}
+                        </Pie>
+                        <RechartsTooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-300 italic text-[10px]">ไม่มีข้อมูลในช่วงเวลานี้</div>
+                  )}
+                </div>
+              </div>
           </div>
 
-          <div className="lg:col-span-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <StatCard 
-                title="P2 Targets" 
-                value={processed?.stats.targetP2 || 0} 
-                sub="จำนวนบิล P2 ทั้งหมด"
-                colorClass="border-indigo-500"
-                icon={Users}
-              />
-              <StatCard 
-                title="UP P2 Count" 
-                value={processed?.stats.totalUpP2Bills || 0} 
-                sub="จำนวนบิลที่มีการ UP P2"
-                colorClass="border-purple-500"
-                icon={ArrowUpRight}
-              />
-              <StatCard 
-                title="Converted P1" 
-                value={processed?.stats.convP1 || 0} 
-                sub="เปลี่ยนสถานะเป็น P1"
-                colorClass="border-emerald-500"
-                icon={CheckCircle}
-              />
-              <StatCard 
-                title="Converted UP P2" 
-                value={processed?.stats.convUpP2 || 0} 
-                sub="อัพเกรดเป็น UP P2"
-                colorClass="border-amber-500"
-                icon={ArrowUpRight}
-              />
-              <StatCard 
-                title="Pending Case" 
-                value={Math.max(0, (processed?.stats.targetP2 || 0) - ((processed?.stats.convP1 || 0) + (processed?.stats.convUpP2 || 0)))} 
-                sub="รอติดตามสถานะ"
-                colorClass="border-red-500"
-                icon={AlertCircle}
-              />
-              <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 rounded-2xl shadow-xl flex flex-col justify-center text-white border border-indigo-400">
-                <p className="text-indigo-200 text-[10px] font-black uppercase tracking-widest mb-1">TOTAL REVENUE (UP P2)</p>
-                <h3 className="text-3xl font-black italic tracking-tighter">฿ {processed?.stats.totalRevenue.toLocaleString()}</h3>
-                <div className="mt-4 flex items-center gap-2">
-                   <div className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-300 rounded-full transition-all duration-1000" style={{width: '70%'}}></div>
-                   </div>
-                   <span className="text-[9px] font-black opacity-60">TARGET REACHED</span>
-                </div>
+          <div className="lg:col-span-3 space-y-6">
+            {/* KPI Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatCard title="🎯 กลุ่มเป้าหมาย P2" value={processed?.stats.countP2_Targets || 0} sub="(คัดแยกชื่อ + เบอร์)" colorClass="border-sky-500" icon={Users} />
+              <StatCard title="💜 บิล UP P2 ทั้งหมด" value={processed?.stats.countTotal_UpP2_Bills || 0} sub="(นับทุกใบเสร็จ UP P2)" colorClass="border-indigo-500" icon={Wallet} />
+              <StatCard title="✅ เปลี่ยนเป็น P1" value={processed?.stats.countP1_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countP1_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="P2 to P1 Success" colorClass="border-emerald-500" icon={CheckCircle2} />
+              <StatCard title="⚠️ Upgrade UP P2" value={processed?.stats.countUpP2_Converted || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countUpP2_Converted/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="นับ P2 ในช่วงเวลาที่กำหนด" colorClass="border-amber-500" icon={ArrowUpRight} />
+              <StatCard title="❌ ยังไม่เปลี่ยนสถานะ" value={processed?.stats.countNone || 0} percent={processed?.stats.countP2_Targets > 0 ? ((processed.stats.countNone/processed.stats.countP2_Targets)*100).toFixed(1) + '%' : '0%'} sub="Pending follow-up" colorClass="border-slate-400" icon={AlertCircle} />
+              <div className="bg-gradient-to-br from-indigo-900 to-slate-900 p-5 rounded-2xl text-white shadow-lg flex flex-col justify-center border-b-4 border-indigo-500">
+                 <p className="text-[10px] font-black uppercase opacity-60 tracking-[2px]">Revenue (UP P2)</p>
+                 <h3 className="text-3xl font-black italic tracking-tighter">฿ {(processed?.stats.totalRevenue || 0).toLocaleString()}</h3>
               </div>
             </div>
 
-            <div className="mt-6 space-y-6">
+            {/* Tables Section */}
+            <div className="space-y-6">
               
-              {/* Success Table */}
+              {/* Table P1 Success */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50/10">
-                  <h3 className="font-black text-xs uppercase tracking-widest text-slate-700 flex items-center gap-2">
-                    <CheckCircle size={14} className="text-emerald-500" /> SUCCESSFUL UP P2 LIST
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50/20">
+                  <h3 className="font-black text-xs uppercase tracking-widest text-emerald-700 flex items-center gap-2">
+                    <CheckCircle2 size={16} /> รายชื่อเปลี่ยนเป็น P1 สำเร็จ
                   </h3>
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-emerald-500 text-white rounded-full shadow-lg shadow-emerald-100">
-                    {filteredSuccess.length} ITEMS
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-emerald-600 text-white rounded-full">
+                    {filteredP1.length} รายการ
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-[300px]">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                      <tr>
+                        <th className="p-4 font-black text-slate-400 uppercase">Customer</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Interest</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Amount (P1)</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Date</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Sale</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredP1.map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4">
+                            <div className="font-bold text-slate-800">{row.name}</div>
+                            <div className="text-[10px] text-slate-400">{row.phone}</div>
+                          </td>
+                          <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
+                          <td className="p-4 font-black text-emerald-600">฿{row.amt.toLocaleString()}</td>
+                          <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH')}</td>
+                          <td className="p-4"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
+                        </tr>
+                      ))}
+                      {filteredP1.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-300 italic font-bold">ไม่พบข้อมูล P1 ในช่วงเวลานี้</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Table UP P2 Bills */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-indigo-50/20">
+                  <h3 className="font-black text-xs uppercase tracking-widest text-indigo-700 flex items-center gap-2">
+                    <ArrowUpRight size={16} /> รายชื่อยอดขาย UP P2 ทั้งหมด
+                  </h3>
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-100">
+                    {filteredUpP2.length} บิล
                   </span>
                 </div>
                 <div className="overflow-x-auto max-h-[350px]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 sticky top-0 z-10">
                       <tr>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Customer</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Product</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Amount</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Date</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Sale</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Customer</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Interest</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">UP P2 Amount</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Date</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Sale</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {filteredSuccess.length > 0 ? filteredSuccess.map((row, i) => (
-                        <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="p-4">
-                            <div className="font-bold text-slate-800">{row.name}</div>
-                            <div className="text-[10px] text-slate-400 font-normal">{row.phone}</div>
-                          </td>
-                          <td className="p-4 text-slate-500 text-[11px] max-w-[140px] truncate" title={row.item}>{row.item}</td>
-                          <td className="p-4 text-emerald-600 font-black tracking-tight">฿{row.amount.toLocaleString()}</td>
-                          <td className="p-4 text-slate-400 whitespace-nowrap">{row.date.toLocaleDateString('th-TH')}</td>
-                          <td className="p-4">
-                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black border border-indigo-100 uppercase">
-                              {row.sale}
-                            </span>
-                          </td>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredUpP2.map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 font-bold text-slate-800">{row.name}</td>
+                          <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
+                          <td className="p-4 font-black text-indigo-600">฿{row.amt.toLocaleString()}</td>
+                          <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH')}</td>
+                          <td className="p-4"><span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
                         </tr>
-                      )) : (
-                        <tr><td colSpan="5" className="p-12 text-center text-slate-300 font-bold uppercase tracking-widest italic">No successful records found</td></tr>
-                      )}
+                      ))}
+                      {filteredUpP2.length === 0 && <tr><td colSpan="5" className="p-8 text-center text-slate-300 italic font-bold">ไม่มีรายการ UP P2 ในช่วงนี้</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -586,48 +528,40 @@ const App = () => {
               {/* Pending Table */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-rose-50/10">
-                  <h3 className="font-black text-xs uppercase tracking-widest text-slate-700 flex items-center gap-2">
-                    <AlertCircle size={14} className="text-rose-500" /> PENDING FOLLOW-UP LIST
+                  <h3 className="font-black text-xs uppercase tracking-widest text-rose-700 flex items-center gap-2">
+                    <AlertCircle size={16} /> ลูกค้า P2 ที่ต้องติดตาม (ยังไม่ปิดการขาย)
                   </h3>
-                  <span className="text-[10px] font-black px-2.5 py-1 bg-rose-500 text-white rounded-full shadow-lg shadow-rose-100">
-                    {filteredPending.length} ITEMS
+                  <span className="text-[10px] font-black px-2.5 py-1 bg-rose-500 text-white rounded-full">
+                    {filteredPending.length} รายการ
                   </span>
                 </div>
-                <div className="overflow-x-auto max-h-[350px]">
+                <div className="overflow-x-auto max-h-[300px]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 sticky top-0 z-10">
                       <tr>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">P2 Date</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Customer</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Interested Item</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Sale</th>
-                        <th className="p-4 font-black text-slate-400 uppercase tracking-tighter border-b border-slate-200">Service Date</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">P2 Date</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Customer</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Interest</th>
+                        <th className="p-4 font-black text-slate-400 uppercase">Service Date</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {filteredPending.length > 0 ? filteredPending.map((row, i) => (
-                        <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="p-4 text-slate-400 whitespace-nowrap">{row.date.toLocaleDateString('th-TH')}</td>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPending.map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 text-slate-400">{row.p2Date.toLocaleDateString('th-TH')}</td>
                           <td className="p-4">
                             <div className="font-bold text-slate-800">{row.name}</div>
-                            <div className="text-[10px] text-slate-400 font-normal">{row.phone}</div>
+                            <div className="text-[10px] text-slate-400">{row.phone}</div>
                           </td>
+                          <td className="p-4 text-slate-500 truncate max-w-[150px]">{row.interest}</td>
                           <td className="p-4">
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 max-w-[160px]">
-                              <Tag size={12} className="text-slate-300" />
-                              <span className="truncate" title={row.interest}>{row.interest}</span>
-                            </div>
-                          </td>
-                          <td className="p-4 text-indigo-600 font-black uppercase whitespace-nowrap">{row.sale}</td>
-                          <td className="p-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">
-                              <MapPin size={10} className="text-indigo-500" /> {row.serviceDate}
-                            </span>
+                             <div className="text-indigo-600 font-bold flex items-center gap-1">
+                                <MapPin size={10} /> {row.serviceDate}
+                             </div>
                           </td>
                         </tr>
-                      )) : (
-                        <tr><td colSpan="5" className="p-12 text-center text-emerald-500 font-black uppercase tracking-widest italic">All clear! No pending follow-ups</td></tr>
-                      )}
+                      ))}
+                      {filteredPending.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-emerald-500 font-bold">เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -638,29 +572,27 @@ const App = () => {
         </section>
 
         <footer className="pt-8 text-center text-slate-400 text-[9px] font-black uppercase tracking-[5px] opacity-40">
-          PROPRIETARY ANALYTICS ENGINE &bull; DATA REFRESHED ON DEMAND
+          PROPRIETARY ANALYTICS ENGINE &bull; DATA REFRESHED ON DEMAND &bull; UNIQUE IDENTITY LOGIC ENABLED
         </footer>
       </div>
 
       {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-50 flex flex-col items-center justify-center">
-          <div className="w-12 h-12 border-[3px] border-indigo-600 border-t-transparent rounded-full animate-spin mb-4 shadow-xl shadow-indigo-100"></div>
-          <p className="text-indigo-700 font-black text-xs tracking-[4px] uppercase animate-pulse">Syncing Engine</p>
+          <div className="w-12 h-12 border-[3px] border-indigo-600 border-t-transparent rounded-full animate-spin mb-4 shadow-xl"></div>
+          <p className="text-indigo-700 font-black text-xs tracking-[4px] uppercase animate-pulse">Syncing Engine...</p>
         </div>
       )}
       
       {/* Error Notification */}
       {error && (
-        <div className="fixed bottom-6 right-6 bg-rose-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 border border-rose-500">
-          <div className="bg-white/20 p-1.5 rounded-full">
-            <AlertCircle size={20} />
-          </div>
+        <div className="fixed bottom-6 right-6 bg-rose-600 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 border border-rose-500 z-[60]">
+          <AlertCircle size={20} />
           <div>
-            <p className="font-black text-sm uppercase tracking-tight">Critical Error</p>
-            <p className="text-[10px] font-medium opacity-80">{error}</p>
+            <p className="font-black text-sm uppercase">Sync Error</p>
+            <p className="text-[10px] opacity-80">{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="ml-4 hover:scale-110 transition-transform">&times;</button>
+          <button onClick={() => setError(null)} className="ml-4 hover:scale-110 transition-transform font-bold">&times;</button>
         </div>
       )}
     </div>
