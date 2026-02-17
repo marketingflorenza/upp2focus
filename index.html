@@ -1,361 +1,638 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2 Sales Dashboard (Standardized & Fixed)</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #0d6efd;
-            --success: #198754;
-            --warning: #ffc107;
-            --purple: #6610f2;
-            --gray: #6c757d;
-            --danger: #dc3545;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
-        body { background-color: #f4f7f6; color: #1a1a1a; line-height: 1.6; }
-        .container { max-width: 1500px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, var(--primary) 0%, #0dcaf0 100%); color: white; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(13,110,253,0.2); }
-        
-        .controls-section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; margin-bottom: 20px; }
-        .filter-group { display: flex; align-items: center; gap: 10px; }
-        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
-        
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: var(--success); color: white; }
-        .btn-secondary { background: var(--gray); color: white; }
-        .btn:disabled { opacity: 0.5; }
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Sector
+} from 'recharts';
+import { 
+  Search, 
+  Download, 
+  RefreshCw, 
+  Calendar, 
+  Users, 
+  CheckCircle, 
+  AlertCircle, 
+  ArrowUpRight,
+  Filter,
+  MapPin,
+  ChevronDown,
+  Tag,
+  PieChart as PieIcon
+} from 'lucide-react';
 
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-left: 6px solid var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
-        .kpi-card.total-up { border-color: var(--purple); }
-        .kpi-card.p1 { border-color: var(--success); }
-        .kpi-card.up-p2 { border-color: var(--warning); }
-        .kpi-card.unconverted { border-color: var(--gray); }
-        .kpi-title { color: #6c757d; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; font-weight: 600; }
-        .kpi-value { font-size: 32px; font-weight: 700; margin-bottom: 5px; }
-        .kpi-percent { font-size: 14px; font-weight: 500; color: var(--success); }
+// --- Constants & Config ---
+const SHEETS = {
+  'Choc': '1F2bTvP1ySUT1q6fzRPQu7UpKNW_ze8GtKkd2rmRUjkI',
+  'Bangyai': '1JU-rhoWIEHH4oSwIWApo8mUC8zQpNcT0Xd-70E_6CNM',
+  'Sriracha': '1PdYqXkrrRGIv-6cCgOn8VXE6MpQhMlBGpFw7BbfzFbI',
+  'Ram': '1LFoETe4YdPIxxj27bXxNRip9dKJ-sL7bbDv820ExEtk',
+  'Bornsong': '1dlgM7YaQmJQTuiuNdAMb6tjKHllPgIs8MjfgGZnp8jU'
+};
 
-        .content-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 20px; }
-        @media (max-width: 992px) { .content-layout { grid-template-columns: 1fr; } }
-        
-        .card-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #eee; }
-        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; max-height: 400px; overflow-y: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th { background: #f8f9fa; padding: 12px 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; }
-        td { padding: 10px 15px; border-bottom: 1px solid #f1f1f1; }
-        
-        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
-        .bg-p1 { background: #d1e7dd; color: #0f5132; }
-        .bg-up-p2 { background: #fff3cd; color: #664d03; }
-        .bg-wait { background: #e2e3e5; color: #41464b; }
-        .bg-danger-light { background: #f8d7da; color: #842029; }
+const BRANCH_NAMES = {
+  'Choc': 'เชียงใหม่ (Choc)',
+  'Bangyai': 'บางใหญ่ (Bangyai)',
+  'Sriracha': 'ศรีราชา (Sriracha)',
+  'Ram': 'รามคำแหง (Ram)',
+  'Bornsong': 'Bornsong'
+};
 
-        #statusMessage { font-size: 14px; text-align: center; margin-top: 10px; }
-    </style>
-</head>
-<body>
+const COLORS = {
+  p1: '#10b981',    // Emerald 500
+  upP2: '#f59e0b',  // Amber 500
+  none: '#94a3b8',  // Slate 400
+  total: '#6366f1'  // Indigo 500
+};
 
-<div class="container">
-    <div class="header">
-        <h1>วิเคราะห์ Sales & Conversion (P2 Focus)</h1>
-        <p>ติดตามผลงานการเปลี่ยนสถานะลูกค้าและการเข้าใช้บริการ</p>
-    </div>
+// --- Custom Active Shape for Pie ---
+const renderActiveShape = (props) => {
+  const RADIAN = Math.PI / 180;
+  const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+  const sin = Math.sin(-RADIAN * midAngle);
+  const cos = Math.cos(-RADIAN * midAngle);
+  const sx = cx + (outerRadius + 10) * cos;
+  const sy = cy + (outerRadius + 10) * sin;
+  const mx = cx + (outerRadius + 30) * cos;
+  const my = cy + (outerRadius + 30) * sin;
+  const ex = mx + (cos >= 0 ? 1 : -1) * 22;
+  const ey = my;
+  const textAnchor = cos >= 0 ? 'start' : 'end';
 
-    <div class="controls-section">
-        <div class="filter-group">
-            <select id="branchSelector">
-                <option value="Choc">Choc (เชียงใหม่)</option>
-                <option value="Bangyai">Bangyai (กรุงเทพฯ)</option>
-                <option value="Sriracha">Sriracha (ชลบุรี)</option>
-                <option value="Ram">Ram (รามอินทรา)</option>
-                <option value="Bornsong">Bornsong</option>
-            </select>
-            <button class="btn btn-primary" onclick="fetchData()" id="loadBtn">🔄 โหลดข้อมูล</button>
-        </div>
-        <div class="filter-group">
-            <input type="date" id="startDate">
-            <span>ถึง</span>
-            <input type="date" id="endDate">
-            <button class="btn btn-success" onclick="processAnalysis()" id="filterBtn" disabled>🔍 กรองข้อมูล</button>
-        </div>
-        <div id="statusMessage"></div>
-    </div>
+  return (
+    <g>
+      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} className="font-bold text-lg">
+        {payload.name}
+      </text>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+      />
+      <Sector
+        cx={cx}
+        cy={cy}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        innerRadius={outerRadius + 6}
+        outerRadius={outerRadius + 10}
+        fill={fill}
+      />
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
+      <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
+      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" className="text-sm font-bold">{`${value} ราย`}</text>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" className="text-xs">
+        {`(${(percent * 100).toFixed(1)}%)`}
+      </text>
+    </g>
+  );
+};
 
-    <div id="dashboardContent" style="display: none;">
-        <div class="dashboard-grid">
-            <div class="kpi-card">
-                <div class="kpi-title">🎯 เป้าหมาย P2</div>
-                <div class="kpi-value" id="totalP2">0</div>
-            </div>
-            <div class="kpi-card total-up">
-                <div class="kpi-title">💜 บิล UP P2 ช่วงวันที่เลือก</div>
-                <div class="kpi-value" id="totalAllUpP2">0</div>
-            </div>
-            <div class="kpi-card p1">
-                <div class="kpi-title">✅ เปลี่ยนเป็น P1</div>
-                <div class="kpi-value" id="countP1">0</div>
-                <div class="kpi-percent" id="percP1">0%</div>
-            </div>
-            <div class="kpi-card up-p2">
-                <div class="kpi-title">⚠️ UP P2 (จาก P2 เดิม)</div>
-                <div class="kpi-value" id="countUpP2">0</div>
-                <div class="kpi-percent" id="percUpP2">0%</div>
-            </div>
-            <div class="kpi-card unconverted">
-                <div class="kpi-title">❌ ยังไม่ซื้อเพิ่ม</div>
-                <div class="kpi-value" id="countNone">0</div>
-                <div class="kpi-percent" style="color:#6c757d" id="percNone">0%</div>
-            </div>
-        </div>
+const App = () => {
+  const [selectedBranch, setSelectedBranch] = useState('Choc');
+  const [rawData, setRawData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
+  
+  const [dateRange, setDateRange] = useState({
+    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
 
-        <div class="content-layout">
-            <div class="card-box">
-                <h3 style="text-align:center;">สัดส่วน Conversion</h3>
-                <div style="height: 300px;"><canvas id="mainChart"></canvas></div>
-            </div>
-            <div class="card-box">
-                <h3>🏆 รายชื่อยอดขาย UP P2 ทั้งหมด (คอลัมน์ K)</h3>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>วันที่</th>
-                                <th>ชื่อลูกค้า</th>
-                                <th>ยอดเงิน</th>
-                                <th>สถานะ</th>
-                                <th>Sale</th>
-                            </tr>
-                        </thead>
-                        <tbody id="successTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+  // --- Data Fetching ---
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    const id = SHEETS[selectedBranch];
+    const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
 
-        <div class="card-box" style="margin-top: 20px;">
-            <h3 style="color: var(--danger);">🚩 รายชื่อลูกค้า P2 รอติดตาม (ยังไม่มาให้บริการ)</h3>
-            <div class="table-container" style="max-height: none;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>วันที่ P2 Lead</th>
-                            <th>ชื่อลูกค้า</th>
-                            <th>เบอร์ติดต่อ</th>
-                            <th>รายการที่สนใจ</th>
-                            <th style="color: var(--primary);">นัดหมายวันที่</th>
-                            <th>Sale ดูแล</th>
-                            <th>หมายเหตุ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pendingTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
+    try {
+      const response = await fetch(url);
+      const text = await response.text();
+      const parsed = parseCSV(text);
+      setRawData(parsed);
+    } catch (err) {
+      setError("ไม่สามารถดึงข้อมูลได้ กรุณาตรวจสอบการแชร์ Google Sheet");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-<script>
-    let rawData = [];
-    let myChart = null;
-    let colMap = { p1: 8, upP2: 10, p2: 13, date: 1, name: 2, phone: 3, note: 6, appt: 7, interest: 5, sale: 0 };
+  useEffect(() => {
+    fetchData();
+  }, [selectedBranch]);
 
-    const SHEETS = {
-        'Choc': '1F2bTvP1ySUT1q6fzRPQu7UpKNW_ze8GtKkd2rmRUjkI',
-        'Bangyai': '1JU-rhoWIEHH4oSwIWApo8mUC8zQpNcT0Xd-70E_6CNM',
-        'Sriracha': '1PdYqXkrrRGIv-6cCgOn8VXE6MpQhMlBGpFw7BbfzFbI',
-        'Ram': '1LFoETe4YdPIxxj27bXxNRip9dKJ-sL7bbDv820ExEtk',
-        'Bornsong': '1dlgM7YaQmJQTuiuNdAMb6tjKHllPgIs8MjfgGZnp8jU'
+  // --- Helper Functions ---
+  const parseCSV = (text) => {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+    return lines.slice(1).map(line => {
+      const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+      const obj = {};
+      headers.forEach((h, i) => {
+        obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '';
+      });
+      return obj;
+    });
+  };
+
+  const parseDate = (s) => {
+    if (!s) return null;
+    const parts = s.split(/[\/\-\.]/);
+    if (parts.length < 3) return null;
+    let d = parseInt(parts[1]), m = parseInt(parts[0]), y = parseInt(parts[2]);
+    if (m > 12) [d, m] = [m, d]; 
+    if (y > 2500) y -= 543;
+    if (y < 100) y += 2000;
+    return new Date(y, m - 1, d);
+  };
+
+  const getVal = (row, keyName) => {
+    if (!row) return '';
+    if (row[keyName] !== undefined) return row[keyName];
+    const target = keyName.replace(/\s+/g, '').toLowerCase();
+    for (let k in row) {
+      if (k.replace(/\s+/g, '').toLowerCase() === target) return row[k];
+    }
+    return '';
+  };
+
+  const parseAmount = (val) => {
+    if (!val) return 0;
+    return parseFloat(String(val).replace(/,/g, '')) || 0;
+  };
+
+  // --- Data Processing ---
+  const processed = useMemo(() => {
+    if (!rawData.length) return null;
+
+    const start = new Date(dateRange.start);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(dateRange.end);
+    end.setHours(23, 59, 59, 999);
+
+    const userHistory = {};
+    rawData.forEach(row => {
+      const phone = getVal(row, 'เบอร์ติดต่อ')?.trim();
+      const date = parseDate(getVal(row, 'วันที่'));
+      if (!phone || !date) return;
+      if (!userHistory[phone]) userHistory[phone] = [];
+      userHistory[phone].push({ ...row, _date: date });
+    });
+
+    let stats = {
+      targetP2: 0,
+      convP1: 0,
+      convUpP2: 0,
+      totalUpP2Bills: 0,
+      totalRevenue: 0
     };
 
-    async function fetchData() {
-        const branch = document.getElementById('branchSelector').value;
-        const msg = document.getElementById('statusMessage');
-        const url = `https://docs.google.com/spreadsheets/d/${SHEETS[branch]}/gviz/tq?tqx=out:csv`;
+    const successList = [];
+    const pendingList = [];
+    const checkedP2Keys = new Set();
+    const checkedUpKeys = new Set();
 
-        msg.innerHTML = "⏳ กำลังดึงข้อมูล...";
-        try {
-            const resp = await fetch(url);
-            const text = await resp.text();
-            rawData = parseCSV(text);
-            
-            // Detect Columns
-            if (rawData.length > 0) {
-                const headers = Object.keys(rawData[0]);
-                const find = (keys) => headers.findIndex(h => keys.some(k => h.toLowerCase().includes(k.toLowerCase())));
-                const p1 = find(['p1', 'ยอดจอง']); if(p1!==-1) colMap.p1 = p1;
-                const up = find(['ยอดอัพ p2', 'อัพ p2', 'upp2']); if(up!==-1) colMap.upP2 = up;
-                const p2 = find(['p2']); if(p2!==-1) colMap.p2 = p2;
-            }
+    for (const phone in userHistory) {
+      userHistory[phone].forEach(log => {
+        if (log._date >= start && log._date <= end) {
+          const amt = parseAmount(getVal(log, 'ยอดอัพ P2'));
+          const note = getVal(log, 'หมายเหตุ')?.toUpperCase();
+          const key = `${phone}_${log._date.getTime()}`;
 
-            msg.innerHTML = `✅ โหลดสำเร็จ ${rawData.length} รายการ`;
-            document.getElementById('filterBtn').disabled = false;
-            document.getElementById('dashboardContent').style.display = 'block';
-
-            const now = new Date();
-            document.getElementById('startDate').valueAsDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            document.getElementById('endDate').valueAsDate = now;
-            processAnalysis();
-        } catch (e) {
-            msg.innerHTML = "❌ Error: " + e.message;
-        }
-    }
-
-    function parseCSV(text) {
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-        return lines.slice(1).map(line => {
-            const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-            const obj = {};
-            headers.forEach((h, i) => obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '');
-            return obj;
-        });
-    }
-
-    function robustParseDate(s) {
-        if (!s) return null;
-        const p = s.split(/[\-\/]/);
-        if (p.length < 3) return null;
-        let d = parseInt(p[0]), m = parseInt(p[1]), y = parseInt(p[2]);
-        if (p[0].length === 4) { y=parseInt(p[0]); m=parseInt(p[1]); d=parseInt(p[2]); }
-        else if (m > 12) { m = parseInt(p[0]); d = parseInt(p[1]); }
-        if (y > 2500) y -= 543;
-        if (y < 100) y += 2000;
-        return new Date(y, m - 1, d);
-    }
-
-    function cleanNum(v) {
-        if (!v) return 0;
-        return parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
-    }
-
-    function processAnalysis() {
-        const start = new Date(document.getElementById('startDate').value);
-        const end = new Date(document.getElementById('endDate').value);
-        start.setHours(0,0,0,0); end.setHours(23,59,59,999);
-
-        const users = {};
-        const successRows = [];
-        const h = Object.keys(rawData[0]);
-
-        // 1. Organize histories and capture Purple KPI
-        let allUpP2Count = 0;
-        rawData.forEach(row => {
-            const date = robustParseDate(row[h[colMap.date]]);
-            if (!date) return;
-            const name = row[h[colMap.name]]?.replace(/^คุณ/, '').trim();
-            const phone = row[h[colMap.phone]]?.trim();
-            const uid = phone && phone.length > 5 ? phone : name;
-            if (!uid) return;
-
-            const upP2Val = cleanNum(row[h[colMap.upP2]]);
-            const note = row[h[colMap.note]]?.toUpperCase() || '';
-            const isUpP2 = upP2Val > 0 || note.includes('UP P2') || note.includes('UPP2');
-
-            if (date >= start && date <= end && isUpP2) {
-                allUpP2Count++;
-                successRows.push({ date, name, amt: upP2Val, sale: row[h[colMap.sale]], note });
-            }
-
-            if (!users[uid]) users[uid] = [];
-            users[uid].push({
-                ...row,
-                _date: date,
-                _isP2: row[h[colMap.p2]] !== '' || note === 'P2',
-                _p1: cleanNum(row[h[colMap.p1]]),
-                _upP1: cleanNum(row[h[10]]), // Common UP P1 pos
-                _upP2: upP2Val,
-                _note: note,
-                _appt: row[h[colMap.appt]]
+          if ((note === 'UP P2' || amt > 0) && !checkedUpKeys.has(key)) {
+            stats.totalUpP2Bills++;
+            stats.totalRevenue += amt;
+            checkedUpKeys.add(key);
+            successList.push({
+              name: getVal(log, 'ชื่อลูกค้า'),
+              phone: phone,
+              item: getVal(log, 'รายการที่สนใจ'),
+              amount: amt,
+              date: log._date,
+              sale: getVal(log, 'Sale'),
+              status: 'UP P2'
             });
-        });
+          }
+        }
+      });
+    }
 
-        let p2Targets = 0, p1Conv = 0, upP2Conv = 0;
-        const pendingList = [];
+    for (const phone in userHistory) {
+      const logs = userHistory[phone].sort((a, b) => a._date - b._date);
+      logs.forEach((log, idx) => {
+        if (log._date >= start && log._date <= end) {
+          const note = getVal(log, 'หมายเหตุ')?.toUpperCase();
+          const key = `${phone}_${log._date.getTime()}`;
 
-        for (const id in users) {
-            const logs = users[id].sort((a,b) => a._date - b._date);
-            logs.forEach((log, idx) => {
-                if (log._isP2 && log._date >= start && log._date <= end && !log._note.includes('UP')) {
-                    p2Targets++;
-                    let converted = false;
-                    for (let i = idx; i < logs.length; i++) {
-                        const n = logs[i];
-                        if (n._p1 > 0 || (n._note.includes('P1') && !n._note.includes('UP'))) { p1Conv++; converted = true; break; }
-                        if (n._upP2 > 0 || n._note.includes('UP P2')) { upP2Conv++; converted = true; break; }
-                    }
-                    if (!converted) {
-                        pendingList.push({
-                            date: log._date,
-                            name: log[h[colMap.name]],
-                            phone: log[h[colMap.phone]],
-                            interest: log[h[colMap.interest]],
-                            appt: log._appt,
-                            sale: log[h[colMap.sale]],
-                            note: log._note
-                        });
-                    }
+          if (note === 'P2' && !checkedP2Keys.has(key)) {
+            stats.targetP2++;
+            checkedP2Keys.add(key);
+
+            let converted = false;
+            if (parseAmount(getVal(log, 'ยอดอัพ P1')) > 0) {
+              stats.convP1++;
+              converted = true;
+            } else if (parseAmount(getVal(log, 'ยอดอัพ P2')) > 0) {
+              stats.convUpP2++;
+              converted = true;
+            }
+
+            if (!converted) {
+              for (let i = idx + 1; i < logs.length; i++) {
+                const next = logs[i];
+                const nextP1 = parseAmount(getVal(next, 'ยอดอัพ P1'));
+                const nextUp = parseAmount(getVal(next, 'ยอดอัพ P2'));
+                const nextNote = getVal(next, 'หมายเหตุ')?.toUpperCase();
+
+                if (nextNote === 'P1' || nextP1 > 0) {
+                  stats.convP1++;
+                  converted = true;
+                  break;
+                } else if (nextNote === 'UP P2' || nextUp > 0) {
+                  stats.convUpP2++;
+                  converted = true;
+                  break;
                 }
-            });
+              }
+            }
+
+            if (!converted) {
+              pendingList.push({
+                date: log._date,
+                name: getVal(log, 'ชื่อลูกค้า'),
+                phone: phone,
+                sale: getVal(log, 'Sale') || '-',
+                interest: getVal(log, 'รายการที่สนใจ') || '-',
+                serviceDate: getVal(log, 'วันที่เข้าใช้บริการ') || 'ยังไม่มีระบุ'
+              });
+            }
+          }
         }
-
-        // Update UI
-        document.getElementById('totalP2').innerText = p2Targets;
-        document.getElementById('totalAllUpP2').innerText = allUpP2Count;
-        document.getElementById('countP1').innerText = p1Conv;
-        document.getElementById('countUpP2').innerText = upP2Conv;
-        const none = Math.max(0, p2Targets - p1Conv - upP2Conv);
-        document.getElementById('countNone').innerText = none;
-
-        const perc = (v) => p2Targets > 0 ? ((v/p2Targets)*100).toFixed(1) + '%' : '0%';
-        document.getElementById('percP1').innerText = perc(p1Conv);
-        document.getElementById('percUpP2').innerText = perc(upP2Conv);
-        document.getElementById('percNone').innerText = perc(none);
-
-        // Update Tables
-        const successBody = document.getElementById('successTableBody');
-        successBody.innerHTML = successRows.sort((a,b)=>b.date-a.date).map(r => `
-            <tr>
-                <td>${r.date.toLocaleDateString('th-TH')}</td>
-                <td><b>${r.name}</b></td>
-                <td style="color:var(--purple); font-weight:600;">${r.amt.toLocaleString()}</td>
-                <td><span class="badge bg-up-p2">UP P2</span></td>
-                <td>${r.sale || '-'}</td>
-            </tr>
-        `).join('');
-
-        const pendingBody = document.getElementById('pendingTableBody');
-        pendingBody.innerHTML = pendingList.map(r => `
-            <tr>
-                <td>${r.date.toLocaleDateString('th-TH')}</td>
-                <td><b>${r.name}</b></td>
-                <td>${r.phone || '-'}</td>
-                <td style="font-size:12px;">${r.interest || '-'}</td>
-                <td style="color:var(--primary); font-weight:600;">${r.appt || '<span style="color:var(--danger)">ยังไม่ระบุ</span>'}</td>
-                <td>${r.sale || '-'}</td>
-                <td><span class="badge bg-wait">${r.note || 'P2'}</span></td>
-            </tr>
-        `).join('');
-
-        updateChart(p1Conv, upP2Conv, none);
+      });
     }
 
-    function updateChart(p1, up, none) {
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        if (myChart) myChart.destroy();
-        myChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['เป็น P1', 'อัพเกรด UP P2', 'รอติดตาม'],
-                datasets: [{ data: [p1, up, none], backgroundColor: ['#198754', '#ffc107', '#adb5bd'] }]
-            },
-            options: { maintainAspectRatio: false, cutout: '70%' }
-        });
-    }
-</script>
-</body>
-</html>
+    return { stats, successList, pendingList };
+  }, [rawData, dateRange]);
+
+  const pieData = useMemo(() => {
+    if (!processed) return [];
+    const noneCount = Math.max(0, processed.stats.targetP2 - (processed.stats.convP1 + processed.stats.convUpP2));
+    return [
+      { name: 'เปลี่ยนเป็น P1', value: processed.stats.convP1, color: COLORS.p1 },
+      { name: 'อัพเกรด UP P2', value: processed.stats.convUpP2, color: COLORS.upP2 },
+      { name: 'ค้างติดตาม', value: noneCount, color: COLORS.none }
+    ].filter(d => d.value >= 0);
+  }, [processed]);
+
+  const filteredSuccess = useMemo(() => {
+    if (!processed) return [];
+    return processed.successList.filter(item => 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      item.phone.includes(searchTerm) ||
+      item.sale.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.item.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [processed, searchTerm]);
+
+  const filteredPending = useMemo(() => {
+    if (!processed) return [];
+    return processed.pendingList.filter(item => 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      item.phone.includes(searchTerm) ||
+      item.sale.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.interest.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [processed, searchTerm]);
+
+  const StatCard = ({ title, value, sub, colorClass, icon: Icon }) => (
+    <div className={`bg-white p-6 rounded-2xl border-l-4 ${colorClass} shadow-sm transition-transform hover:scale-[1.02]`}>
+      <div className="flex justify-between items-start mb-2">
+        <p className="text-slate-500 text-sm font-medium uppercase tracking-wider">{title}</p>
+        <div className={`p-2 rounded-lg opacity-80 ${colorClass.replace('border-', 'bg-')}`}>
+          <Icon size={18} className="text-white" />
+        </div>
+      </div>
+      <h3 className="text-3xl font-bold text-slate-800">{value}</h3>
+      <p className="text-xs text-slate-400 mt-1 font-medium">{sub}</p>
+    </div>
+  );
+
+  const onPieEnter = (_, index) => {
+    setActiveIndex(index);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* Header Section */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2 text-indigo-700">
+              <span className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-md shadow-indigo-200">
+                <ArrowUpRight size={24} />
+              </span>
+              P2 Performance Insight
+            </h1>
+            <p className="text-slate-500 text-sm mt-1">วิเคราะห์ประสิทธิภาพการปิดการขายจากกลุ่มเป้าหมาย P2</p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-tighter">เลือกสาขา:</span>
+              <div className="relative">
+                <select 
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  className="appearance-none bg-slate-100 border-none rounded-xl pl-4 pr-10 py-2.5 text-sm font-semibold text-indigo-700 ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all outline-none cursor-pointer hover:bg-slate-200"
+                >
+                  {Object.entries(BRANCH_NAMES).map(([key, name]) => (
+                    <option key={key} value={key}>{name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
+              </div>
+            </div>
+            
+            <button 
+              onClick={fetchData} 
+              className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors border border-indigo-100 shadow-sm"
+              title="รีเฟรชข้อมูล"
+            >
+              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
+        </header>
+
+        {/* Filters & KPI Grid */}
+        <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1 space-y-4">
+             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+               <h4 className="font-semibold flex items-center gap-2 text-slate-700"><Filter size={16} /> ตัวกรองข้อมูล</h4>
+               <div className="space-y-3">
+                 <div>
+                   <label className="text-xs font-bold text-slate-400 mb-1 block uppercase">วันที่เริ่ม</label>
+                   <input 
+                    type="date" 
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))}
+                    className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                   />
+                 </div>
+                 <div>
+                   <label className="text-xs font-bold text-slate-400 mb-1 block uppercase">วันที่สิ้นสุด</label>
+                   <input 
+                    type="date" 
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))}
+                    className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                   />
+                 </div>
+               </div>
+               <div className="pt-2">
+                 <div className="relative">
+                   <Search size={16} className="absolute left-3 top-3 text-slate-400" />
+                   <input 
+                    type="text" 
+                    placeholder="ค้นหาชื่อ/เบอร์/Sale..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-2.5 text-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                   />
+                 </div>
+               </div>
+             </div>
+
+             {/* Pie Chart Analysis Section */}
+             {processed && (
+               <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                 <h4 className="font-bold flex items-center gap-2 text-slate-700 mb-4"><PieIcon size={16} className="text-indigo-500" /> สัดส่วน Conversion</h4>
+                 <div className="h-[280px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          activeIndex={activeIndex}
+                          activeShape={renderActiveShape}
+                          data={pieData}
+                          innerRadius={60}
+                          outerRadius={80}
+                          dataKey="value"
+                          onMouseEnter={onPieEnter}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                 </div>
+                 <div className="mt-4 space-y-2">
+                    {pieData.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs font-medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                          <span className="text-slate-500">{item.name}</span>
+                        </div>
+                        <span className="text-slate-800">{item.value} ราย</span>
+                      </div>
+                    ))}
+                 </div>
+               </div>
+             )}
+          </div>
+
+          <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatCard 
+                title="กลุ่มเป้าหมาย P2" 
+                value={processed?.stats.targetP2 || 0} 
+                sub="จำนวนบิล P2 ตั้งต้น"
+                colorClass="border-indigo-500"
+                icon={Users}
+              />
+              <StatCard 
+                title="บิล UP P2 รวม" 
+                value={processed?.stats.totalUpP2Bills || 0} 
+                sub={`รายได้รวม: ฿${processed?.stats.totalRevenue.toLocaleString()}`}
+                colorClass="border-purple-500"
+                icon={ArrowUpRight}
+              />
+              <StatCard 
+                title="เปลี่ยนเป็น P1" 
+                value={processed?.stats.convP1 || 0} 
+                sub={`${((processed?.stats.convP1 / (processed?.stats.targetP2 || 1)) * 100).toFixed(1)}% ของ P2`}
+                colorClass="border-emerald-500"
+                icon={CheckCircle}
+              />
+              <StatCard 
+                title="อัพเกรด UP P2 (จาก P2)" 
+                value={processed?.stats.convUpP2 || 0} 
+                sub={`${((processed?.stats.convUpP2 / (processed?.stats.targetP2 || 1)) * 100).toFixed(1)}% ของ P2`}
+                colorClass="border-amber-500"
+                icon={ArrowUpRight}
+              />
+              <StatCard 
+                title="ยังไม่เปลี่ยนสถานะ" 
+                value={Math.max(0, (processed?.stats.targetP2 || 0) - ((processed?.stats.convP1 || 0) + (processed?.stats.convUpP2 || 0)))} 
+                sub="ค้างติดตามการเข้าใช้บริการ"
+                colorClass="border-slate-400"
+                icon={AlertCircle}
+              />
+              <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-6 rounded-2xl shadow-lg flex flex-col justify-center text-white border border-indigo-500">
+                <p className="text-indigo-100 text-xs font-bold uppercase tracking-wider mb-1 opacity-80">ยอดขาย UP P2 รวม</p>
+                <h3 className="text-3xl font-bold">฿ {processed?.stats.totalRevenue.toLocaleString()}</h3>
+                <div className="mt-4 flex items-center gap-2">
+                   <div className="h-2 flex-1 bg-white/20 rounded-full overflow-hidden">
+                      <div className="h-full bg-white rounded-full transition-all duration-1000" style={{width: '65%'}}></div>
+                   </div>
+                   <span className="text-[10px] font-bold">ยอดขายทั้งหมด</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-6">
+              
+              {/* Success Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-emerald-50/20">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <CheckCircle size={18} className="text-emerald-500" /> รายการที่ปิดการขาย UP P2 ได้สำเร็จ
+                  </h3>
+                  <span className="text-xs font-bold px-3 py-1 bg-white border border-emerald-100 rounded-full text-emerald-600 shadow-sm">
+                    {filteredSuccess.length} รายการ
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-[400px]">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                      <tr>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">ชื่อลูกค้า</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">รายการ</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">ยอดอัพ</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">วันที่</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">Sale</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredSuccess.length > 0 ? filteredSuccess.map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 font-bold text-slate-700">{row.name}</td>
+                          <td className="p-4 text-slate-500 text-xs max-w-[150px] truncate" title={row.item}>{row.item}</td>
+                          <td className="p-4 text-emerald-600 font-bold">฿{row.amount.toLocaleString()}</td>
+                          <td className="p-4 text-slate-400 whitespace-nowrap">{row.date.toLocaleDateString('th-TH')}</td>
+                          <td className="p-4">
+                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold border border-indigo-100 uppercase">
+                              {row.sale}
+                            </span>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan="5" className="p-12 text-center text-slate-400 italic font-medium">ไม่พบรายการสำเร็จในช่วงเวลาที่ระบุ</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Pending Table */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-rose-50/20">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                    <AlertCircle size={18} className="text-rose-500" /> ลูกค้า P2 ที่ค้างติดตาม (ยังไม่ปิดการขาย)
+                  </h3>
+                  <span className="text-xs font-bold px-3 py-1 bg-white border border-rose-100 rounded-full text-rose-600 shadow-sm">
+                    {filteredPending.length} รายการ
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-[400px]">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 sticky top-0 z-10">
+                      <tr>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">วันที่ P2</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">ชื่อลูกค้า</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">รายการที่สนใจ</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">Sale</th>
+                        <th className="p-4 font-semibold text-slate-500 border-b border-slate-200">วันที่ใช้บริการล่าสุด</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPending.length > 0 ? filteredPending.map((row, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4 text-slate-400 whitespace-nowrap">{row.date.toLocaleDateString('th-TH')}</td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-700">{row.name}</div>
+                            <div className="text-[10px] text-slate-400">{row.phone}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 max-w-[180px]">
+                              <Tag size={12} className="text-slate-300" />
+                              <span className="truncate" title={row.interest}>{row.interest}</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-indigo-600 font-medium whitespace-nowrap">{row.sale}</td>
+                          <td className="p-4">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200">
+                              <MapPin size={12} className="text-indigo-500" /> {row.serviceDate}
+                            </span>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan="5" className="p-12 text-center text-emerald-500 font-bold">เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <footer className="pt-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-[3px] opacity-60">
+          Analytics & Performance Engine &bull; Branch: {selectedBranch} &bull; Active Filters Applied
+        </footer>
+      </div>
+
+      {loading && (
+        <div className="fixed inset-0 bg-white/70 backdrop-blur-md z-50 flex flex-col items-center justify-center">
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6 shadow-xl shadow-indigo-100"></div>
+          <div className="space-y-1 text-center">
+            <p className="text-indigo-700 font-black text-lg tracking-tight animate-pulse">กำลังประมวลผลข้อมูล...</p>
+            <p className="text-slate-400 text-xs font-medium tracking-widest uppercase">Syncing with Google Sheets</p>
+          </div>
+        </div>
+      )}
+      
+      {error && (
+        <div className="fixed bottom-8 right-8 bg-rose-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="bg-white/20 p-2 rounded-full">
+            <AlertCircle size={24} />
+          </div>
+          <div>
+            <p className="font-bold text-lg">พบข้อผิดพลาด</p>
+            <p className="text-xs opacity-90">{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="ml-4 text-white/60 hover:text-white">&times;</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
