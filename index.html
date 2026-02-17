@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2 Sales Dashboard (P1 Column I Focus)</title>
+    <title>P2 Sales Dashboard (Standardized & Fixed)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -13,192 +13,146 @@
             --warning: #ffc107;
             --purple: #6610f2;
             --gray: #6c757d;
-            --light: #f8f9fa;
+            --danger: #dc3545;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Kanit', sans-serif; }
-        body { background-color: #f4f7f6; color: #333; line-height: 1.6; }
-        
+        body { background-color: #f4f7f6; color: #1a1a1a; line-height: 1.6; }
         .container { max-width: 1500px; margin: 0 auto; padding: 20px; }
-
-        .header { 
-            background: linear-gradient(135deg, var(--primary) 0%, #0dcaf0 100%); 
-            color: white; padding: 30px 20px; border-radius: 15px;
-            text-align: center; margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(13, 110, 253, 0.2);
-        }
-
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #edf2f7; margin-bottom: 20px; overflow: hidden; }
-        .controls-section { padding: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between; }
-        .filter-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .header { background: linear-gradient(135deg, var(--primary) 0%, #0dcaf0 100%); color: white; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(13,110,253,0.2); }
         
-        select, input { padding: 10px 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        .controls-section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; margin-bottom: 20px; }
+        .filter-group { display: flex; align-items: center; gap: 10px; }
+        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
         
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-success { background: var(--success); color: white; }
-        .btn-secondary { background: #e2e8f0; color: #4a5568; }
+        .btn-secondary { background: var(--gray); color: white; }
+        .btn:disabled { opacity: 0.5; }
 
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-bottom: 4px solid var(--primary); }
-        .kpi-card.p2 { border-color: var(--primary); }
-        .kpi-card.up-p2-total { border-color: var(--purple); }
-        .kpi-card.p1-conv { border-color: var(--success); }
-        .kpi-card.up-p2-conv { border-color: var(--warning); }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .kpi-card { background: white; padding: 20px; border-radius: 12px; border-left: 6px solid var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
+        .kpi-card.total-up { border-color: var(--purple); }
+        .kpi-card.p1 { border-color: var(--success); }
+        .kpi-card.up-p2 { border-color: var(--warning); }
+        .kpi-card.unconverted { border-color: var(--gray); }
+        .kpi-title { color: #6c757d; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; font-weight: 600; }
+        .kpi-value { font-size: 32px; font-weight: 700; margin-bottom: 5px; }
+        .kpi-percent { font-size: 14px; font-weight: 500; color: var(--success); }
+
+        .content-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 20px; }
+        @media (max-width: 992px) { .content-layout { grid-template-columns: 1fr; } }
         
-        .kpi-label { color: var(--gray); font-size: 13px; font-weight: 500; text-transform: uppercase; margin-bottom: 10px; line-height: 1.2; height: 32px; display: flex; align-items: center; }
-        .kpi-value { font-size: 32px; font-weight: 700; color: #1a202c; display: flex; align-items: baseline; gap: 5px; }
-        .kpi-sub { font-size: 14px; color: var(--success); font-weight: 500; }
-
-        .main-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 25px; }
-        @media (max-width: 992px) { .main-layout { grid-template-columns: 1fr; } }
-
-        .chart-container { height: 350px; padding: 20px; }
-        .table-container { height: 400px; overflow-y: auto; }
-
+        .card-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #eee; }
+        .table-container { overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid #eee; max-height: 400px; overflow-y: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th { background: #f8fafc; padding: 12px 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 1; border-bottom: 1px solid #e2e8f0; }
-        td { padding: 12px 15px; border-bottom: 1px solid #f1f5f9; }
+        th { background: #f8f9fa; padding: 12px 15px; text-align: left; font-weight: 600; position: sticky; top: 0; z-index: 10; border-bottom: 2px solid #ddd; }
+        td { padding: 10px 15px; border-bottom: 1px solid #f1f1f1; }
         
-        .badge { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
-        .bg-success { background: #dcfce7; color: #166534; }
-        .bg-warning { background: #fef9c3; color: #854d0e; }
-        .bg-purple { background: #f3e8ff; color: #581c87; }
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .bg-p1 { background: #d1e7dd; color: #0f5132; }
+        .bg-up-p2 { background: #fff3cd; color: #664d03; }
+        .bg-wait { background: #e2e3e5; color: #41464b; }
+        .bg-danger-light { background: #f8d7da; color: #842029; }
 
-        #statusText { padding: 10px; font-size: 14px; border-radius: 8px; text-align: center; display: none; margin-bottom: 15px; }
-        .status-loading { display: block !important; background: #e0f2fe; color: #0369a1; }
-        .status-error { display: block !important; background: #fee2e2; color: #991b1b; }
-
-        .table-section-title { padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; }
-        .table-section-title h3 { font-size: 16px; margin: 0; }
+        #statusMessage { font-size: 14px; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h1>Sales & Conversion Dashboard (P2 Focus)</h1>
-        <p>วิเคราะห์ข้อมูลเป้าหมาย P2 ที่เปลี่ยนเป็นยอดชำระ P1 (ดึงข้อมูลช่อง I)</p>
+        <h1>วิเคราะห์ Sales & Conversion (P2 Focus)</h1>
+        <p>ติดตามผลงานการเปลี่ยนสถานะลูกค้าและการเข้าใช้บริการ</p>
     </div>
 
-    <div class="card">
-        <div class="controls-section">
-            <div class="filter-group">
-                <select id="branchSelector">
-                    <option value="" disabled selected>-- เลือกสาขา --</option>
-                    <option value="Choc">Choc (FRC)</option>
-                    <option value="Bangyai">Bangyai (FRB)</option>
-                    <option value="Sriracha">Sriracha (FRS)</option>
-                    <option value="Ram">Ram (FRR)</option>
-                    <option value="Bornsong">BSK</option>
-                </select>
-                <button class="btn btn-primary" onclick="loadData()">🔄 ดึงข้อมูล</button>
-            </div>
-            <div class="filter-group">
-                <input type="date" id="startDate">
-                <span>ถึง</span>
-                <input type="date" id="endDate">
-                <button class="btn btn-success" id="filterBtn" onclick="processData()" disabled>🔍 กรองข้อมูล</button>
-                <button class="btn btn-secondary" onclick="resetFilters()">ล้าง</button>
-            </div>
+    <div class="controls-section">
+        <div class="filter-group">
+            <select id="branchSelector">
+                <option value="Choc">Choc (เชียงใหม่)</option>
+                <option value="Bangyai">Bangyai (กรุงเทพฯ)</option>
+                <option value="Sriracha">Sriracha (ชลบุรี)</option>
+                <option value="Ram">Ram (รามอินทรา)</option>
+                <option value="Bornsong">Bornsong</option>
+            </select>
+            <button class="btn btn-primary" onclick="fetchData()" id="loadBtn">🔄 โหลดข้อมูล</button>
         </div>
+        <div class="filter-group">
+            <input type="date" id="startDate">
+            <span>ถึง</span>
+            <input type="date" id="endDate">
+            <button class="btn btn-success" onclick="processAnalysis()" id="filterBtn" disabled>🔍 กรองข้อมูล</button>
+        </div>
+        <div id="statusMessage"></div>
     </div>
 
-    <div id="statusText"></div>
-
-    <div id="dashboard" style="display:none;">
-        <div class="kpi-grid">
-            <div class="kpi-card p2">
-                <div class="kpi-label">🎯 เป้าหมาย P2</div>
-                <div class="kpi-value" id="kpi-total-p2">0</div>
+    <div id="dashboardContent" style="display: none;">
+        <div class="dashboard-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">🎯 เป้าหมาย P2</div>
+                <div class="kpi-value" id="totalP2">0</div>
             </div>
-            <div class="kpi-card up-p2-total">
-                <div class="kpi-label">💜 บิล UP P2 ที่เข้ามาในช่วงเวลาที่เลือก</div>
-                <div class="kpi-value" id="kpi-all-up-p2">0</div>
+            <div class="kpi-card total-up">
+                <div class="kpi-title">💜 บิล UP P2 ช่วงวันที่เลือก</div>
+                <div class="kpi-value" id="totalAllUpP2">0</div>
             </div>
-            <div class="kpi-card p1-conv">
-                <div class="kpi-label">✅ เปลี่ยนเป็น P1 (ช่อง I)</div>
-                <div class="kpi-value">
-                    <span id="kpi-conv-p1">0</span>
-                    <span class="kpi-sub" id="perc-p1">0%</span>
-                </div>
+            <div class="kpi-card p1">
+                <div class="kpi-title">✅ เปลี่ยนเป็น P1</div>
+                <div class="kpi-value" id="countP1">0</div>
+                <div class="kpi-percent" id="percP1">0%</div>
             </div>
-            <div class="kpi-card up-p2-conv">
-                <div class="kpi-label">⚠️ UP P2 ช่วงเวลาทั้งหมด</div>
-                <div class="kpi-value">
-                    <span id="kpi-conv-up">0</span>
-                    <span class="kpi-sub" id="perc-up" style="color:var(--warning)">0%</span>
-                </div>
+            <div class="kpi-card up-p2">
+                <div class="kpi-title">⚠️ UP P2 (จาก P2 เดิม)</div>
+                <div class="kpi-value" id="countUpP2">0</div>
+                <div class="kpi-percent" id="percUpP2">0%</div>
+            </div>
+            <div class="kpi-card unconverted">
+                <div class="kpi-title">❌ ยังไม่ซื้อเพิ่ม</div>
+                <div class="kpi-value" id="countNone">0</div>
+                <div class="kpi-percent" style="color:#6c757d" id="percNone">0%</div>
             </div>
         </div>
 
-        <div class="main-layout">
-            <div class="card">
-                <div class="chart-container">
-                    <h3 style="margin-bottom:15px; text-align:center; font-size:16px;">สัดส่วนการปิดงาน P2</h3>
-                    <canvas id="convChart"></canvas>
-                </div>
+        <div class="content-layout">
+            <div class="card-box">
+                <h3 style="text-align:center;">สัดส่วน Conversion</h3>
+                <div style="height: 300px;"><canvas id="mainChart"></canvas></div>
             </div>
-            <div class="card">
-                <div class="table-section-title">
-                    <h3 style="color: var(--purple);">💜 บิล UP P2 ที่เข้ามาในช่วงเวลาที่เลือก</h3>
-                </div>
+            <div class="card-box">
+                <h3>🏆 รายชื่อยอดขาย UP P2 ทั้งหมด (คอลัมน์ K)</h3>
                 <div class="table-container">
-                    <table id="upP2Table">
+                    <table>
                         <thead>
                             <tr>
                                 <th>วันที่</th>
                                 <th>ชื่อลูกค้า</th>
-                                <th>รายการ</th>
-                                <th>ยอดขาย</th>
+                                <th>ยอดเงิน</th>
+                                <th>สถานะ</th>
                                 <th>Sale</th>
                             </tr>
                         </thead>
-                        <tbody id="upP2Body"></tbody>
+                        <tbody id="successTableBody"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="table-section-title">
-                <h3 style="color: var(--success);">🏆 รายการ P1 (เฉพาะเป้าหมาย P2 ที่เปลี่ยนเป็น P1 จากช่อง I)</h3>
-            </div>
-            <div class="table-container" style="height: 400px;">
-                <table id="p1Table">
+        <div class="card-box" style="margin-top: 20px;">
+            <h3 style="color: var(--danger);">🚩 รายชื่อลูกค้า P2 รอติดตาม (ยังไม่มาให้บริการ)</h3>
+            <div class="table-container" style="max-height: none;">
+                <table>
                     <thead>
                         <tr>
-                            <th>วันที่ P1</th>
-                            <th>ชื่อลูกค้า</th>
-                            <th>รายการ</th>
-                            <th>ยอดชำระ P1 (ช่อง I)</th>
-                            <th>Sale</th>
-                        </tr>
-                    </thead>
-                    <tbody id="p1Body"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="card">
-            <div style="padding:15px 20px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="font-size:16px; color:#e53e3e;">🚩 รายการ P2 รอติดตาม (ยังไม่มีการซื้อเพิ่ม)</h3>
-                <span id="pendingCount" class="badge bg-purple" style="font-size:14px;">0 รายการ</span>
-            </div>
-            <div class="table-container" style="height:400px;">
-                <table id="pendingTable">
-                    <thead>
-                        <tr>
-                            <th>วันที่ P2</th>
+                            <th>วันที่ P2 Lead</th>
                             <th>ชื่อลูกค้า</th>
                             <th>เบอร์ติดต่อ</th>
                             <th>รายการที่สนใจ</th>
-                            <th style="color: var(--primary);">วันที่จะเข้ามาให้บริการ</th>
-                            <th>Sale</th>
-                            <th>สถานะ</th>
+                            <th style="color: var(--primary);">นัดหมายวันที่</th>
+                            <th>Sale ดูแล</th>
+                            <th>หมายเหตุ</th>
                         </tr>
                     </thead>
-                    <tbody id="pendingBody"></tbody>
+                    <tbody id="pendingTableBody"></tbody>
                 </table>
             </div>
         </div>
@@ -206,6 +160,10 @@
 </div>
 
 <script>
+    let rawData = [];
+    let myChart = null;
+    let colMap = { p1: 8, upP2: 10, p2: 13, date: 1, name: 2, phone: 3, note: 6, appt: 7, interest: 5, sale: 0 };
+
     const SHEETS = {
         'Choc': '1F2bTvP1ySUT1q6fzRPQu7UpKNW_ze8GtKkd2rmRUjkI',
         'Bangyai': '1JU-rhoWIEHH4oSwIWApo8mUC8zQpNcT0Xd-70E_6CNM',
@@ -214,100 +172,36 @@
         'Bornsong': '1dlgM7YaQmJQTuiuNdAMb6tjKHllPgIs8MjfgGZnp8jU'
     };
 
-    let rawData = [];
-    let chartInstance = null;
-
-    function getValFlexible(row, keywords) {
-        for (let key in row) {
-            const cleanKey = key.trim().toLowerCase().replace(/\s+/g, '');
-            for (let kw of keywords) {
-                const cleanKw = kw.toLowerCase().replace(/\s+/g, '');
-                if (cleanKey === cleanKw || cleanKey.includes(cleanKw)) return row[key];
-            }
-        }
-        return '';
-    }
-
-    // ฟังก์ชันพิเศษเพื่อดึงข้อมูลจาก Column I (Index 8 ใน CSV ที่ไม่มี Header ว่างนำหน้า)
-    function getP1Value(row) {
-        // ลองหาจากชื่อก่อน
-        const val = getValFlexible(row, ['P1', 'ยอดจอง']);
-        if (val !== '') return cleanNumeric(val);
-        
-        // ถ้าหาไม่เจอ ให้ลองดึงจากตำแหน่ง Index 8 (Column I)
-        const keys = Object.keys(row);
-        if (keys.length > 8) {
-            return cleanNumeric(row[keys[8]]);
-        }
-        return 0;
-    }
-
-    function robustParseDate(s) {
-        if (!s) return null;
-        s = s.trim();
-        let parts = s.split(/[\-\/]/);
-        if (parts.length < 3) return null;
-
-        let p1 = parseInt(parts[0]);
-        let p2 = parseInt(parts[1]);
-        let p3 = parseInt(parts[2]);
-        let d, m, y;
-
-        if (p1 > 1000) { 
-            y = p1; m = p2; d = p3;
-        } else if (p1 > 12) {
-            d = p1; m = p2; y = p3;
-        } else if (p2 > 12) {
-            m = p1; d = p2; y = p3;
-        } else {
-            d = p1; m = p2; y = p3;
-        }
-
-        if (y > 2500) y -= 543;
-        if (y < 100) y += 2000;
-        
-        const dt = new Date(y, m - 1, d);
-        return isNaN(dt.getTime()) ? null : dt;
-    }
-
-    function cleanNumeric(val) {
-        if (!val) return 0;
-        const cleaned = val.toString().replace(/[^\d.-]/g, '');
-        return parseFloat(cleaned) || 0;
-    }
-
-    function normalizeName(name) {
-        if (!name) return '';
-        return name.replace(/^คุณ/, '').trim().replace(/\s+/g, '');
-    }
-
-    async function loadData() {
+    async function fetchData() {
         const branch = document.getElementById('branchSelector').value;
-        const status = document.getElementById('statusText');
-        if(!branch) return alert("กรุณาเลือกสาขา");
+        const msg = document.getElementById('statusMessage');
+        const url = `https://docs.google.com/spreadsheets/d/${SHEETS[branch]}/gviz/tq?tqx=out:csv`;
 
-        status.innerHTML = "⌛ กำลังดึงข้อมูลจาก Google Sheets...";
-        status.className = "status-loading";
-
+        msg.innerHTML = "⏳ กำลังดึงข้อมูล...";
         try {
-            const id = SHEETS[branch];
-            const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
             const resp = await fetch(url);
             const text = await resp.text();
-            
             rawData = parseCSV(text);
-            status.innerHTML = `✅ โหลดสำเร็จ ${rawData.length} แถว`;
+            
+            // Detect Columns
+            if (rawData.length > 0) {
+                const headers = Object.keys(rawData[0]);
+                const find = (keys) => headers.findIndex(h => keys.some(k => h.toLowerCase().includes(k.toLowerCase())));
+                const p1 = find(['p1', 'ยอดจอง']); if(p1!==-1) colMap.p1 = p1;
+                const up = find(['ยอดอัพ p2', 'อัพ p2', 'upp2']); if(up!==-1) colMap.upP2 = up;
+                const p2 = find(['p2']); if(p2!==-1) colMap.p2 = p2;
+            }
+
+            msg.innerHTML = `✅ โหลดสำเร็จ ${rawData.length} รายการ`;
             document.getElementById('filterBtn').disabled = false;
-            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('dashboardContent').style.display = 'block';
 
             const now = new Date();
             document.getElementById('startDate').valueAsDate = new Date(now.getFullYear(), now.getMonth(), 1);
             document.getElementById('endDate').valueAsDate = now;
-
-            processData();
+            processAnalysis();
         } catch (e) {
-            status.innerHTML = "❌ Error: " + e.message;
-            status.className = "status-error";
+            msg.innerHTML = "❌ Error: " + e.message;
         }
     }
 
@@ -317,222 +211,150 @@
         return lines.slice(1).map(line => {
             const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
             const obj = {};
-            headers.forEach((h, i) => {
-                obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '';
-            });
+            headers.forEach((h, i) => obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '');
             return obj;
         });
     }
 
-    function processData() {
-        const start = document.getElementById('startDate').value ? new Date(document.getElementById('startDate').value) : null;
-        const end = document.getElementById('endDate').value ? new Date(document.getElementById('endDate').value) : null;
-        if(start) start.setHours(0,0,0,0);
-        if(end) end.setHours(23,59,59,999);
+    function robustParseDate(s) {
+        if (!s) return null;
+        const p = s.split(/[\-\/]/);
+        if (p.length < 3) return null;
+        let d = parseInt(p[0]), m = parseInt(p[1]), y = parseInt(p[2]);
+        if (p[0].length === 4) { y=parseInt(p[0]); m=parseInt(p[1]); d=parseInt(p[2]); }
+        else if (m > 12) { m = parseInt(p[0]); d = parseInt(p[1]); }
+        if (y > 2500) y -= 543;
+        if (y < 100) y += 2000;
+        return new Date(y, m - 1, d);
+    }
 
-        const usersByPhone = {}; 
-        const usersByName = {}; 
-        
-        let p2Targets = 0;
-        let p1ConvertedCount = 0;
-        let upP2ConvertedCount = 0;
-        let allUpP2BillsTotal = 0;
-        
-        let upP2DisplayList = [];
-        let p1DisplayList = [];
-        let pendingDisplayList = [];
+    function cleanNum(v) {
+        if (!v) return 0;
+        return parseFloat(String(v).replace(/[^\d.-]/g, '')) || 0;
+    }
 
-        // Pre-process and index data
+    function processAnalysis() {
+        const start = new Date(document.getElementById('startDate').value);
+        const end = new Date(document.getElementById('endDate').value);
+        start.setHours(0,0,0,0); end.setHours(23,59,59,999);
+
+        const users = {};
+        const successRows = [];
+        const h = Object.keys(rawData[0]);
+
+        // 1. Organize histories and capture Purple KPI
+        let allUpP2Count = 0;
         rawData.forEach(row => {
-            const date = robustParseDate(getValFlexible(row, ['วันที่', 'date']));
+            const date = robustParseDate(row[h[colMap.date]]);
             if (!date) return;
+            const name = row[h[colMap.name]]?.replace(/^คุณ/, '').trim();
+            const phone = row[h[colMap.phone]]?.trim();
+            const uid = phone && phone.length > 5 ? phone : name;
+            if (!uid) return;
 
-            const name = getValFlexible(row, ['ชื่อลูกค้า', 'ชื่อ']).trim();
-            const phone = getValFlexible(row, ['เบอร์ติดต่อ', 'เบอร์โทร', 'phone']).trim();
-            const note = getValFlexible(row, ['หมายเหตุ', 'note']).toUpperCase();
-            
-            // ดึงค่า P1 จากช่อง I (Index 8)
-            const p1Amt = getP1Value(row);
-            const upP2Amt = cleanNumeric(getValFlexible(row, ['ยอดอัพP2', 'ยอดอัพ P2']));
+            const upP2Val = cleanNum(row[h[colMap.upP2]]);
+            const note = row[h[colMap.note]]?.toUpperCase() || '';
+            const isUpP2 = upP2Val > 0 || note.includes('UP P2') || note.includes('UPP2');
 
-            const entry = {
+            if (date >= start && date <= end && isUpP2) {
+                allUpP2Count++;
+                successRows.push({ date, name, amt: upP2Val, sale: row[h[colMap.sale]], note });
+            }
+
+            if (!users[uid]) users[uid] = [];
+            users[uid].push({
                 ...row,
                 _date: date,
-                _name: name,
-                _normName: normalizeName(name),
-                _phone: phone,
+                _isP2: row[h[colMap.p2]] !== '' || note === 'P2',
+                _p1: cleanNum(row[h[colMap.p1]]),
+                _upP1: cleanNum(row[h[10]]), // Common UP P1 pos
+                _upP2: upP2Val,
                 _note: note,
-                _p1Amt: p1Amt,
-                _upP2Amt: upP2Amt,
-                _isP2: getValFlexible(row, ['P2']).trim() !== '' || (note === 'P2'),
-                _serviceDate: getValFlexible(row, ['วันที่เข้าใช้บริการ', 'นัดหมาย', 'วันที่เข้า'])
-            };
-
-            if (phone && phone.length > 5) {
-                if (!usersByPhone[phone]) usersByPhone[phone] = [];
-                usersByPhone[phone].push(entry);
-            }
-            if (entry._normName) {
-                if (!usersByName[entry._normName]) usersByName[entry._normName] = [];
-                usersByName[entry._normName].push(entry);
-            }
+                _appt: row[h[colMap.appt]]
+            });
         });
 
-        // Loop for UP P2 Volume
-        rawData.forEach(row => {
-            const d = robustParseDate(getValFlexible(row, ['วันที่']));
-            if (!d || d < start || d > end) return;
-            
-            const note = getValFlexible(row, ['หมายเหตุ', 'note']).toUpperCase();
-            const upP2AmtValue = cleanNumeric(getValFlexible(row, ['ยอดอัพ P2', 'ยอดอัพP2']));
+        let p2Targets = 0, p1Conv = 0, upP2Conv = 0;
+        const pendingList = [];
 
-            if (upP2AmtValue > 0 || note.includes('UP P2')) {
-                allUpP2BillsTotal++;
-                upP2DisplayList.push({
-                    date: d,
-                    name: getValFlexible(row, ['ชื่อลูกค้า']),
-                    interest: getValFlexible(row, ['รายการที่สนใจ']),
-                    amt: upP2AmtValue,
-                    sale: getValFlexible(row, ['Sale', 'เซลล์'])
-                });
-            }
-        });
-
-        const processedP2Keys = new Set();
-        
-        const processLogs = (logs) => {
+        for (const id in users) {
+            const logs = users[id].sort((a,b) => a._date - b._date);
             logs.forEach((log, idx) => {
-                const isP2Entry = log._isP2 && !log._note.includes('UP');
-                const inRange = log._date >= start && log._date <= end;
-                
-                if (isP2Entry && inRange) {
-                    const key = (log._phone || log._normName) + log._date.getTime();
-                    if (processedP2Keys.has(key)) return;
-                    processedP2Keys.add(key);
-                    
+                if (log._isP2 && log._date >= start && log._date <= end && !log._note.includes('UP')) {
                     p2Targets++;
                     let converted = false;
-                    
                     for (let i = idx; i < logs.length; i++) {
                         const n = logs[i];
-                        
-                        // เคสเปลี่ยนเป็น P1 (เงื่อนไข: มียอดในช่อง I และต้องไม่ใช่ UP P1)
-                        const isRealP1 = n._p1Amt > 0 && !n._note.includes('UP P1');
-                        const isUpP2 = n._upP2Amt > 0 || n._note.includes('UP P2');
-
-                        if (isRealP1) {
-                            p1ConvertedCount++; 
-                            converted = true;
-                            p1DisplayList.push({
-                                date: n._date,
-                                name: n._name,
-                                interest: getValFlexible(n, ['รายการที่สนใจ']),
-                                amt: n._p1Amt,
-                                sale: getValFlexible(n, ['Sale', 'เซลล์'])
-                            });
-                            break;
-                        } 
-                        else if (isUpP2) {
-                            upP2ConvertedCount++; converted = true; 
-                            break;
-                        }
+                        if (n._p1 > 0 || (n._note.includes('P1') && !n._note.includes('UP'))) { p1Conv++; converted = true; break; }
+                        if (n._upP2 > 0 || n._note.includes('UP P2')) { upP2Conv++; converted = true; break; }
                     }
-
                     if (!converted) {
-                        pendingDisplayList.push({
+                        pendingList.push({
                             date: log._date,
-                            name: log._name,
-                            phone: log._phone,
-                            interest: getValFlexible(log, ['รายการที่สนใจ']),
-                            serviceDate: log._serviceDate,
-                            sale: getValFlexible(log, ['Sale']),
-                            status: log._note || 'P2'
+                            name: log[h[colMap.name]],
+                            phone: log[h[colMap.phone]],
+                            interest: log[h[colMap.interest]],
+                            appt: log._appt,
+                            sale: log[h[colMap.sale]],
+                            note: log._note
                         });
                     }
                 }
             });
-        };
-
-        for(let p in usersByPhone) processLogs(usersByPhone[p].sort((a,b)=>a._date-b._date));
-        for (let name in usersByName) {
-            const logs = usersByName[name];
-            if (!logs.some(l => l._phone && l._phone.length > 5)) {
-                processLogs(logs.sort((a,b) => a._date - b._date));
-            }
         }
 
-        document.getElementById('kpi-total-p2').innerText = p2Targets;
-        document.getElementById('kpi-all-up-p2').innerText = allUpP2BillsTotal;
-        document.getElementById('kpi-conv-p1').innerText = p1ConvertedCount;
-        document.getElementById('kpi-conv-up').innerText = upP2ConvertedCount;
+        // Update UI
+        document.getElementById('totalP2').innerText = p2Targets;
+        document.getElementById('totalAllUpP2').innerText = allUpP2Count;
+        document.getElementById('countP1').innerText = p1Conv;
+        document.getElementById('countUpP2').innerText = upP2Conv;
+        const none = Math.max(0, p2Targets - p1Conv - upP2Conv);
+        document.getElementById('countNone').innerText = none;
 
-        const calcPerc = (v) => p2Targets > 0 ? ((v/p2Targets)*100).toFixed(1) + '%' : '0%';
-        document.getElementById('perc-p1').innerText = calcPerc(p1ConvertedCount);
-        document.getElementById('perc-up').innerText = calcPerc(upP2ConvertedCount);
+        const perc = (v) => p2Targets > 0 ? ((v/p2Targets)*100).toFixed(1) + '%' : '0%';
+        document.getElementById('percP1').innerText = perc(p1Conv);
+        document.getElementById('percUpP2').innerText = perc(upP2Conv);
+        document.getElementById('percNone').innerText = perc(none);
 
-        updateTable('upP2Body', upP2DisplayList, r => `
+        // Update Tables
+        const successBody = document.getElementById('successTableBody');
+        successBody.innerHTML = successRows.sort((a,b)=>b.date-a.date).map(r => `
             <tr>
                 <td>${r.date.toLocaleDateString('th-TH')}</td>
                 <td><b>${r.name}</b></td>
-                <td style="font-size:12px; color:#555;">${r.interest || '-'}</td>
                 <td style="color:var(--purple); font-weight:600;">${r.amt.toLocaleString()}</td>
-                <td>${r.sale}</td>
+                <td><span class="badge bg-up-p2">UP P2</span></td>
+                <td>${r.sale || '-'}</td>
             </tr>
-        `);
+        `).join('');
 
-        updateTable('p1Body', p1DisplayList, r => `
-            <tr>
-                <td>${r.date.toLocaleDateString('th-TH')}</td>
-                <td><b>${r.name}</b></td>
-                <td style="font-size:12px; color:#555;">${r.interest || '-'}</td>
-                <td style="color:var(--success); font-weight:600;">${r.amt.toLocaleString()}</td>
-                <td>${r.sale}</td>
-            </tr>
-        `);
-
-        updateTable('pendingBody', pendingDisplayList, r => `
+        const pendingBody = document.getElementById('pendingTableBody');
+        pendingBody.innerHTML = pendingList.map(r => `
             <tr>
                 <td>${r.date.toLocaleDateString('th-TH')}</td>
                 <td><b>${r.name}</b></td>
                 <td>${r.phone || '-'}</td>
-                <td style="font-size:12px; color:var(--gray);">${r.interest || '-'}</td>
-                <td style="color:var(--primary); font-weight:500;">${r.serviceDate || '-'}</td>
-                <td>${r.sale}</td>
-                <td><span class="badge" style="background:#eee; color:#666;">${r.status}</span></td>
+                <td style="font-size:12px;">${r.interest || '-'}</td>
+                <td style="color:var(--primary); font-weight:600;">${r.appt || '<span style="color:var(--danger)">ยังไม่ระบุ</span>'}</td>
+                <td>${r.sale || '-'}</td>
+                <td><span class="badge bg-wait">${r.note || 'P2'}</span></td>
             </tr>
-        `);
+        `).join('');
 
-        document.getElementById('pendingCount').innerText = `${pendingDisplayList.length} รายการ`;
-        updateChart(p1ConvertedCount, upP2ConvertedCount, Math.max(0, p2Targets - p1ConvertedCount - upP2ConvertedCount));
-    }
-
-    function updateTable(id, data, formatter) {
-        const el = document.getElementById(id);
-        data.sort((a,b) => b.date - a.date);
-        el.innerHTML = data.length ? data.map(formatter).join('') : '<tr><td colspan="7" style="text-align:center; padding:20px; color:#999;">ไม่พบข้อมูลในช่วงเวลานี้</td></tr>';
+        updateChart(p1Conv, upP2Conv, none);
     }
 
     function updateChart(p1, up, none) {
-        const ctx = document.getElementById('convChart').getContext('2d');
-        if (chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(ctx, {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['เป็น P1', 'Upgrade P2', 'รอติดตาม'],
-                datasets: [{
-                    data: [p1, up, none],
-                    backgroundColor: ['#198754', '#ffc107', '#cbd5e1'],
-                    borderWidth: 0
-                }]
+                labels: ['เป็น P1', 'อัพเกรด UP P2', 'รอติดตาม'],
+                datasets: [{ data: [p1, up, none], backgroundColor: ['#198754', '#ffc107', '#adb5bd'] }]
             },
-            options: { maintainAspectRatio: false, cutout: '75%' }
+            options: { maintainAspectRatio: false, cutout: '70%' }
         });
-    }
-
-    function resetFilters() {
-        document.getElementById('branchSelector').selectedIndex = 0;
-        document.getElementById('dashboard').style.display = 'none';
-        document.getElementById('statusText').style.display = 'none';
     }
 </script>
 </body>
