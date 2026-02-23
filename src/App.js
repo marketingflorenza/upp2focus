@@ -49,12 +49,10 @@ const BRANCH_NAMES = {
 };
 
 // ==========================================
-// ⚠️ ตั้งค่า AIRTABLE แบบปลอดภัย (Environment Variables) ⚠️
+// ⚠️ ตั้งค่า AIRTABLE Token โดยตรงเพื่อการทดสอบ
 // ==========================================
-// ห้ามนำ Token ตัวจริงมาใส่ในไฟล์นี้เด็ดขาดเพื่อป้องกันการถูกขโมยจากหน้าเว็บ
-// กรุณาตั้งค่าผ่าน Environment Variables ของระบบเซิร์ฟเวอร์
-const AIRTABLE_PAT = typeof process !== 'undefined' && process.env ? process.env.REACT_APP_AIRTABLE_PAT : ''; 
-const AIRTABLE_BASE_ID = 'appuQaGsJFGRrcw85'; // Base ID ไม่ถือเป็นความลับ ใส่ในโค้ดได้
+const AIRTABLE_PAT = 'patEpm1a9qbA4UNmI.e4e04718b6440936eeb4ba95176697b096ce4d46feaed2a62da855d11034f3a5'; 
+const AIRTABLE_BASE_ID = 'appuQaGsJFGRrcw85'; 
 const AIRTABLE_TABLE_NAME = 'Note_Storage'; 
 
 const COLORS = {
@@ -137,7 +135,7 @@ const NoteCell = ({ branchId, rowId, initialNote, airtableRecordId, onNoteSaved 
 
   const handleSave = async () => {
     if (!AIRTABLE_PAT) {
-      alert(`ไม่พบ Airtable Token: กรุณาตั้งค่าตัวแปร Environment (REACT_APP_AIRTABLE_PAT หรือ VITE_AIRTABLE_PAT) ให้เรียบร้อย`);
+      alert(`ไม่พบ Airtable Token: กรุณาตรวจสอบการตั้งค่า AIRTABLE_PAT`);
       return;
     }
 
@@ -145,14 +143,11 @@ const NoteCell = ({ branchId, rowId, initialNote, airtableRecordId, onNoteSaved 
     setIsSuccess(false);
 
     try {
-      const isUpdate = !!airtableRecordId; // ถ้ามี Record ID แปลว่าเคยจดแล้ว ให้แก้ของเดิม
+      const isUpdate = !!airtableRecordId; 
       
-      // ใช้ Endpoint กลาง (Bulk Endpoint) ซึ่งเป็นมาตรฐานที่ Airtable แนะนำ และป้องกันปัญหา CORS Failed to fetch
       const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
-      
       const method = isUpdate ? 'PATCH' : 'POST';
       
-      // จัดรูปแบบ Data ให้มี "records" ครอบตาม API Specification ของ Airtable เพื่อป้องกัน Error 422
       const bodyData = {
         records: [
           isUpdate 
@@ -177,11 +172,10 @@ const NoteCell = ({ branchId, rowId, initialNote, airtableRecordId, onNoteSaved 
       }
 
       const responseData = await response.json();
-      // ดึง ID ของ Record ที่ถูกสร้าง/แก้ไขล่าสุดกลับมา
       const newRecordId = responseData.records[0].id;
       
       setIsSuccess(true);
-      onNoteSaved(rowId, text, newRecordId); // ส่งค่ากลับไปอัปเดต state ทันที
+      onNoteSaved(rowId, text, newRecordId); 
       setTimeout(() => setIsSuccess(false), 2000);
     } catch (error) {
       console.error("Save note error:", error);
@@ -223,16 +217,14 @@ const App = () => {
   const [selectedBranch, setSelectedBranch] = useState('Bangyai');
   const [rawData, setRawData] = useState([]);
   
-  // States สำหรับเก็บข้อมูล Note จาก Airtable
   const [rawNotes, setRawNotes] = useState({});
-  const [airtableIds, setAirtableIds] = useState({}); // เก็บ Record ID ของ Airtable สำหรับการอัปเดตข้อมูล
+  const [airtableIds, setAirtableIds] = useState({}); 
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // ฟังก์ชันอัปเดตข้อมูลบนหน้าจอทันทีเมื่อบันทึกสำเร็จ
   const updateLocalNote = (id, text, recordId) => {
     setRawNotes(prev => ({ ...prev, [id]: text }));
     if (recordId) {
@@ -293,7 +285,6 @@ const App = () => {
     const mainUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Sum&tq=select%20*&_cb=${cacheBuster}`;
     
     try {
-      // 1. ดึงข้อมูลหลักจาก Google Sheets (รายชื่อลูกค้า)
       const mainResponse = await fetch(mainUrl, { cache: 'no-store' });
       if (!mainResponse.ok) throw new Error("Network Response Error");
       const mainText = await mainResponse.text();
@@ -309,13 +300,11 @@ const App = () => {
       });
       setRawData(parsedData);
 
-      // 2. ดึงข้อมูล Notes จาก AIRTABLE API
       let notesDict = {};
       let recordIdsDict = {};
       
       if (AIRTABLE_PAT) {
         try {
-          // เข้ารหัส Formula เพื่อป้องกันปัญหา Error เวลามีอักขระพิเศษ
           const formula = `{Branch}='${selectedBranch}'`;
           const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}?filterByFormula=${encodeURIComponent(formula)}`;
           
@@ -331,8 +320,8 @@ const App = () => {
             airtableData.records.forEach(record => {
               const rowId = record.fields.ID;
               if (rowId) {
-                notesDict[rowId] = record.fields.Notes || ''; // ปรับเป็น Notes ตามชื่อคอลัมน์ของคุณ
-                recordIdsDict[rowId] = record.id; // เก็บ Record ID ไว้ใช้อัปเดต
+                notesDict[rowId] = record.fields.Notes || ''; 
+                recordIdsDict[rowId] = record.id; 
               }
             });
           } else {
@@ -484,7 +473,7 @@ const App = () => {
               interest: getVal(log, 'รายการที่สนใจ') || '-',
               arrivalDate: parsedArrivalDate || rawArrivalDate || '-',
               note: rawNotes[log._identityKey] || '', 
-              airtableRecordId: airtableIds[log._identityKey] || null // เพิ่มตัวแปร Record ID เพื่อใช้ตอนอัปเดต
+              airtableRecordId: airtableIds[log._identityKey] || null 
             });
           }
         }
@@ -499,7 +488,7 @@ const App = () => {
       p1SuccessList,
       pendingDetails
     };
-  }, [rawData, dateRange, rawNotes, airtableIds]); // เพิ่ม airtableIds ใน dependency
+  }, [rawData, dateRange, rawNotes, airtableIds]); 
 
   const pieData = useMemo(() => {
     if (!processed || processed.stats.countP2_Targets === 0) return [];
