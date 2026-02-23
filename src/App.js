@@ -673,7 +673,6 @@ const App = () => {
                         <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-28"><div className="flex items-center gap-1"><Clock size={12}/> วันที่เข้า</div></th>
                         <th className="p-3 font-black text-rose-800 uppercase text-[10px] bg-rose-100/50 w-32"><div className="flex items-center gap-1"><Phone size={12}/> เบอร์โทรศัพท์</div></th>
                         <th className="p-3 font-black text-rose-800 uppercase text-[10px] min-w-[120px]">รายการที่สนใจ</th>
-                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-24">Sale ผู้ดูแล</th>
                         <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-48">📝 บันทึกการติดตาม</th>
                       </tr>
                     </thead>
@@ -696,12 +695,6 @@ const App = () => {
                           </td>
                           <td className="p-3 text-slate-500 italic max-w-[150px] leading-tight break-words whitespace-pre-wrap">{row.interest}</td>
                           <td className="p-3">
-                            <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-                               <UserCheck size={12} className="text-rose-400" />
-                               {row.sale}
-                            </div>
-                          </td>
-                          <td className="p-3">
                             {/* ดึง NoteCell ของ Airtable มาใช้ พร้อมส่ง Record ID */}
                             <NoteCell 
                               branchId={selectedBranch} 
@@ -713,7 +706,7 @@ const App = () => {
                           </td>
                         </tr>
                       ))}
-                      {filteredPending.length === 0 && <tr><td colSpan="7" className="p-12 text-center text-emerald-500 font-black text-lg">🎉 เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
+                      {filteredPending.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-emerald-500 font-black text-lg">🎉 เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
                     </tbody>
                   </table>
                 </div>
