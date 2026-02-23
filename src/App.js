@@ -25,7 +25,10 @@ import {
   Wallet,
   CheckCircle2,
   UserCheck,
-  Phone
+  Phone,
+  Save,
+  Loader2,
+  MessageSquare
 } from 'lucide-react';
 
 // --- Constants & Config ---
@@ -45,12 +48,43 @@ const BRANCH_NAMES = {
   'Bornsong': 'BSK'
 };
 
+// ==========================================
+// ⚠️ ตั้งค่า AIRTABLE แบบปลอดภัย (Environment Variables) ⚠️
+// ==========================================
+// ห้ามนำ Token ตัวจริงมาใส่ในไฟล์นี้เด็ดขาดเพื่อป้องกันการถูกขโมยจากหน้าเว็บ
+// กรุณาตั้งค่าผ่าน Environment Variables ของระบบเซิร์ฟเวอร์
+const AIRTABLE_PAT = typeof process !== 'undefined' && process.env ? process.env.REACT_APP_AIRTABLE_PAT : ''; 
+const AIRTABLE_BASE_ID = 'appuQaGsJFGRrcw85'; // Base ID ไม่ถือเป็นความลับ ใส่ในโค้ดได้
+const AIRTABLE_TABLE_NAME = 'Note_Storage'; 
+
 const COLORS = {
   target: '#0ea5e9', // Sky
   allUp: '#6366f1',   // Indigo
   p1: '#10b981',      // Emerald
   upP2: '#f59e0b',   // Amber
   none: '#f43f5e',   // Rose (Alert for pending)
+};
+
+// --- Custom Robust CSV Parser สำหรับข้อมูลตารางหลัก ---
+const parseCSV = (str) => {
+  const arr = [];
+  let quote = false;
+  let row = 0, col = 0;
+  for (let c = 0; c < str.length; c++) {
+    let cc = str[c], nc = str[c+1];
+    arr[row] = arr[row] || [];
+    arr[row][col] = arr[row][col] || '';
+    
+    if (cc === '"' && quote && nc === '"') { arr[row][col] += cc; ++c; continue; }
+    if (cc === '"') { quote = !quote; continue; }
+    if (cc === ',' && !quote) { ++col; continue; }
+    if (cc === '\r' && nc === '\n' && !quote) { ++row; col = 0; ++c; continue; }
+    if (cc === '\n' && !quote) { ++row; col = 0; continue; }
+    if (cc === '\r' && !quote) { ++row; col = 0; continue; }
+    
+    arr[row][col] += cc;
+  }
+  return arr;
 };
 
 const renderActiveShape = (props) => {
@@ -91,13 +125,120 @@ const renderActiveShape = (props) => {
   );
 };
 
+// --- Sub-component สำหรับจัดการช่องพิมพ์ Note (Airtable Version) ---
+const NoteCell = ({ branchId, rowId, initialNote, airtableRecordId, onNoteSaved }) => {
+  const [text, setText] = useState(initialNote || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  useEffect(() => {
+    setText(initialNote || '');
+  }, [initialNote]);
+
+  const handleSave = async () => {
+    if (!AIRTABLE_PAT) {
+      alert(`ไม่พบ Airtable Token: กรุณาตั้งค่าตัวแปร Environment (REACT_APP_AIRTABLE_PAT หรือ VITE_AIRTABLE_PAT) ให้เรียบร้อย`);
+      return;
+    }
+
+    setIsSaving(true);
+    setIsSuccess(false);
+
+    try {
+      const isUpdate = !!airtableRecordId; // ถ้ามี Record ID แปลว่าเคยจดแล้ว ให้แก้ของเดิม
+      
+      // ใช้ Endpoint กลาง (Bulk Endpoint) ซึ่งเป็นมาตรฐานที่ Airtable แนะนำ และป้องกันปัญหา CORS Failed to fetch
+      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
+      
+      const method = isUpdate ? 'PATCH' : 'POST';
+      
+      // จัดรูปแบบ Data ให้มี "records" ครอบตาม API Specification ของ Airtable เพื่อป้องกัน Error 422
+      const bodyData = {
+        records: [
+          isUpdate 
+            ? { id: airtableRecordId, fields: { "Notes": text } } 
+            : { fields: { "ID": rowId, "Notes": text, "Branch": branchId } }
+        ]
+      };
+
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_PAT}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('Airtable Error:', errText);
+        throw new Error('Airtable API response not OK');
+      }
+
+      const responseData = await response.json();
+      // ดึง ID ของ Record ที่ถูกสร้าง/แก้ไขล่าสุดกลับมา
+      const newRecordId = responseData.records[0].id;
+      
+      setIsSuccess(true);
+      onNoteSaved(rowId, text, newRecordId); // ส่งค่ากลับไปอัปเดต state ทันที
+      setTimeout(() => setIsSuccess(false), 2000);
+    } catch (error) {
+      console.error("Save note error:", error);
+      alert("เกิดข้อผิดพลาดในการบันทึกไปที่ Airtable");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-start gap-2">
+      <div className="relative flex-1">
+        <MessageSquare size={12} className="absolute left-2 top-2.5 text-rose-300" />
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="พิมพ์บันทึก..."
+          className="w-full bg-white border border-rose-200 rounded-md py-1.5 pl-7 pr-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent min-h-[32px] resize-y"
+          rows={1}
+        />
+      </div>
+      <button
+        onClick={handleSave}
+        disabled={isSaving || text === initialNote}
+        className={`p-1.5 rounded-md flex-shrink-0 transition-all ${
+          isSuccess ? 'bg-emerald-100 text-emerald-600' : 
+          (isSaving || text === initialNote) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-rose-100 text-rose-600 hover:bg-rose-200 shadow-sm'
+        }`}
+        title="บันทึกย่อ"
+      >
+        {isSaving ? <Loader2 size={16} className="animate-spin" /> : 
+         isSuccess ? <CheckCircle size={16} /> : <Save size={16} />}
+      </button>
+    </div>
+  );
+};
+
 const App = () => {
   const [selectedBranch, setSelectedBranch] = useState('Bangyai');
   const [rawData, setRawData] = useState([]);
+  
+  // States สำหรับเก็บข้อมูล Note จาก Airtable
+  const [rawNotes, setRawNotes] = useState({});
+  const [airtableIds, setAirtableIds] = useState({}); // เก็บ Record ID ของ Airtable สำหรับการอัปเดตข้อมูล
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // ฟังก์ชันอัปเดตข้อมูลบนหน้าจอทันทีเมื่อบันทึกสำเร็จ
+  const updateLocalNote = (id, text, recordId) => {
+    setRawNotes(prev => ({ ...prev, [id]: text }));
+    if (recordId) {
+      setAirtableIds(prev => ({ ...prev, [id]: recordId }));
+    }
+  };
   
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
@@ -147,25 +288,64 @@ const App = () => {
     setLoading(true);
     setError(null);
     const id = SHEETS[selectedBranch];
-    const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Sum`;
-
+    
+    const cacheBuster = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const mainUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=Sum&tq=select%20*&_cb=${cacheBuster}`;
+    
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Network Response Error");
-      const text = await response.text();
+      // 1. ดึงข้อมูลหลักจาก Google Sheets (รายชื่อลูกค้า)
+      const mainResponse = await fetch(mainUrl, { cache: 'no-store' });
+      if (!mainResponse.ok) throw new Error("Network Response Error");
+      const mainText = await mainResponse.text();
       
-      const lines = text.split('\n');
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
-      const parsed = lines.slice(1).map(line => {
-        const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+      const mainParsed = parseCSV(mainText);
+      const headers = mainParsed[0].map(h => h.trim());
+      const parsedData = mainParsed.slice(1).map(row => {
         const obj = {};
         headers.forEach((h, i) => {
-          obj[h] = values[i] ? values[i].replace(/"/g, '').trim() : '';
+          obj[h] = row[i] ? row[i].trim() : '';
         });
         return obj;
       });
+      setRawData(parsedData);
+
+      // 2. ดึงข้อมูล Notes จาก AIRTABLE API
+      let notesDict = {};
+      let recordIdsDict = {};
       
-      setRawData(parsed);
+      if (AIRTABLE_PAT) {
+        try {
+          // เข้ารหัส Formula เพื่อป้องกันปัญหา Error เวลามีอักขระพิเศษ
+          const formula = `{Branch}='${selectedBranch}'`;
+          const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}?filterByFormula=${encodeURIComponent(formula)}`;
+          
+          const airtableResponse = await fetch(airtableUrl, {
+            headers: {
+              'Authorization': `Bearer ${AIRTABLE_PAT}`
+            }
+          });
+          
+          if (airtableResponse.ok) {
+            const airtableData = await airtableResponse.json();
+            
+            airtableData.records.forEach(record => {
+              const rowId = record.fields.ID;
+              if (rowId) {
+                notesDict[rowId] = record.fields.Notes || ''; // ปรับเป็น Notes ตามชื่อคอลัมน์ของคุณ
+                recordIdsDict[rowId] = record.id; // เก็บ Record ID ไว้ใช้อัปเดต
+              }
+            });
+          } else {
+            console.error("Failed to fetch Airtable Notes:", airtableResponse.status);
+          }
+        } catch (e) {
+          console.error("Error fetching Airtable data:", e);
+        }
+      }
+      
+      setRawNotes(notesDict);
+      setAirtableIds(recordIdsDict);
+
     } catch (err) {
       setError("ไม่สามารถโหลดข้อมูลได้ ตรวจสอบการแชร์ของ Google Sheet");
     } finally {
@@ -197,7 +377,7 @@ const App = () => {
 
       const identityKey = `${phone}_${name}`;
       if (!userHistory[identityKey]) userHistory[identityKey] = [];
-      userHistory[identityKey].push({ ...row, _date: date, _note: note, _phone: phone, _name: name });
+      userHistory[identityKey].push({ ...row, _date: date, _note: note, _phone: phone, _name: name, _identityKey: identityKey });
     });
 
     let countP2_Targets = 0;
@@ -296,12 +476,15 @@ const App = () => {
             const rawArrivalDate = getVal(log, 'วันที่เข้าใช้บริการ');
             const parsedArrivalDate = parseDate(rawArrivalDate);
             pendingDetails.push({
+              id: log._identityKey, 
               p2Date: log._date,
               name: log._name,
               phone: log._phone,
               sale: getVal(log, 'Sale') || '-',
               interest: getVal(log, 'รายการที่สนใจ') || '-',
-              arrivalDate: parsedArrivalDate || rawArrivalDate || '-'
+              arrivalDate: parsedArrivalDate || rawArrivalDate || '-',
+              note: rawNotes[log._identityKey] || '', 
+              airtableRecordId: airtableIds[log._identityKey] || null // เพิ่มตัวแปร Record ID เพื่อใช้ตอนอัปเดต
             });
           }
         }
@@ -316,7 +499,7 @@ const App = () => {
       p1SuccessList,
       pendingDetails
     };
-  }, [rawData, dateRange]);
+  }, [rawData, dateRange, rawNotes, airtableIds]); // เพิ่ม airtableIds ใน dependency
 
   const pieData = useMemo(() => {
     if (!processed || processed.stats.countP2_Targets === 0) return [];
@@ -348,7 +531,8 @@ const App = () => {
     return processed.pendingDetails.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       s.phone.includes(searchTerm) ||
-      (s.sale && s.sale.toLowerCase().includes(searchTerm.toLowerCase()))
+      (s.sale && s.sale.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (s.note && s.note.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [processed, searchTerm]);
 
@@ -413,7 +597,7 @@ const App = () => {
                   </div>
                   <div className="relative pt-2">
                     <Search size={14} className="absolute left-3 top-5 text-slate-400" />
-                    <input type="text" placeholder="ค้นหาชื่อ/เบอร์/Sale..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-50 border-none rounded-lg pl-9 pr-4 py-2.5 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
+                    <input type="text" placeholder="ค้นหาชื่อ/เบอร์/Sale/Note..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-50 border-none rounded-lg pl-9 pr-4 py-2.5 text-xs outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500" />
                   </div>
                 </div>
               </div>
@@ -479,7 +663,7 @@ const App = () => {
             </div>
 
             <div className="space-y-6">
-              {/* Pending Table */}
+              {/* Pending Table พร้อมช่องบันทึกการติดตาม */}
               <div className="bg-white rounded-2xl shadow-xl border-2 border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
                 <div className="p-4 border-b border-rose-100 flex justify-between items-center bg-rose-50/30">
                   <h3 className="font-black text-sm uppercase tracking-wider text-rose-700 flex items-center gap-2">
@@ -491,47 +675,56 @@ const App = () => {
                     </span>
                   </div>
                 </div>
-                <div className="overflow-x-auto max-h-[400px]">
+                <div className="overflow-x-auto max-h-[500px]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-rose-50/50 sticky top-0 z-10 backdrop-blur-sm">
                       <tr>
-                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">วันที่เป็น P2</th>
-                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">ชื่อลูกค้า</th>
-                        <th className="p-4 font-black text-rose-800 uppercase text-[10px] bg-rose-100/50"><div className="flex items-center gap-1"><Phone size={12}/> เบอร์โทรศัพท์</div></th>
-                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">รายการที่สนใจ</th>
-                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">Sale ผู้ดูแล</th>
-                        <th className="p-4 font-black text-rose-800 uppercase text-[10px]">วันที่จะเข้ามา</th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-24">วันที่เป็น P2</th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-40">ชื่อลูกค้า</th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-28"><div className="flex items-center gap-1"><Clock size={12}/> วันที่เข้า</div></th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] bg-rose-100/50 w-32"><div className="flex items-center gap-1"><Phone size={12}/> เบอร์โทรศัพท์</div></th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] min-w-[120px]">รายการที่สนใจ</th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-24">Sale ผู้ดูแล</th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-48">📝 บันทึกการติดตาม</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-rose-100">
                       {filteredPending.map((row, i) => (
-                        <tr key={i} className="hover:bg-rose-50/30 transition-colors">
-                          <td className="p-4 text-slate-500 font-medium">{row.p2Date.toLocaleDateString('th-TH')}</td>
-                          <td className="p-4">
+                        <tr key={`${row.id}_${i}`} className="hover:bg-rose-50/30 transition-colors">
+                          <td className="p-3 text-slate-500 font-medium">{row.p2Date.toLocaleDateString('th-TH')}</td>
+                          <td className="p-3">
                             <div className="font-black text-slate-800 text-sm">{row.name}</div>
                           </td>
-                          <td className="p-4 bg-rose-50/20">
+                          <td className="p-3">
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-100/50 text-rose-700 font-bold text-[10px]">
+                              {row.arrivalDate instanceof Date ? row.arrivalDate.toLocaleDateString('th-TH') : (row.arrivalDate !== '-' ? row.arrivalDate : 'ไม่ระบุ')}
+                            </div>
+                          </td>
+                          <td className="p-3 bg-rose-50/20">
                             <a href={`tel:${row.phone}`} className="font-mono text-sm font-black text-rose-600 hover:underline flex items-center gap-1">
                                {row.phone}
                             </a>
                           </td>
-                          <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
-                          <td className="p-4">
+                          <td className="p-3 text-slate-500 italic max-w-[150px] leading-tight break-words whitespace-pre-wrap">{row.interest}</td>
+                          <td className="p-3">
                             <div className="flex items-center gap-1.5 text-slate-700 font-bold">
                                <UserCheck size={12} className="text-rose-400" />
                                {row.sale}
                             </div>
                           </td>
-                          <td className="p-4">
-                             <div className="text-slate-500 font-medium">
-                                {row.arrivalDate instanceof Date 
-                                  ? row.arrivalDate.toLocaleDateString('th-TH') 
-                                  : row.arrivalDate}
-                             </div>
+                          <td className="p-3">
+                            {/* ดึง NoteCell ของ Airtable มาใช้ พร้อมส่ง Record ID */}
+                            <NoteCell 
+                              branchId={selectedBranch} 
+                              rowId={row.id} 
+                              initialNote={row.note} 
+                              airtableRecordId={row.airtableRecordId} 
+                              onNoteSaved={updateLocalNote} 
+                            />
                           </td>
                         </tr>
                       ))}
-                      {filteredPending.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-emerald-500 font-black text-lg">🎉 เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
+                      {filteredPending.length === 0 && <tr><td colSpan="7" className="p-12 text-center text-emerald-500 font-black text-lg">🎉 เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -619,14 +812,6 @@ const App = () => {
           PROPRIETARY ANALYTICS ENGINE &bull; DATA REFRESHED ON DEMAND &bull; UNIQUE IDENTITY LOGIC ENABLED
         </footer>
       </div>
-
-      {/* Loading Overlay */}
-      {loading && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-50 flex flex-col items-center justify-center">
-          <div className="w-12 h-12 border-[3px] border-indigo-600 border-t-transparent rounded-full animate-spin mb-4 shadow-xl"></div>
-          <p className="text-indigo-700 font-black text-xs tracking-[4px] uppercase animate-pulse">Syncing Engine...</p>
-        </div>
-      )}
     </div>
   );
 };
