@@ -214,7 +214,8 @@ const NoteCell = ({ branchId, rowId, initialNote, airtableRecordId, onNoteSaved 
 };
 
 const App = () => {
-  const [selectedBranch, setSelectedBranch] = useState('Bangyai');
+  // เปลี่ยนค่าเริ่มต้นให้เป็นสาขา FRC (Choc)
+  const [selectedBranch, setSelectedBranch] = useState('Choc');
   const [rawData, setRawData] = useState([]);
   
   const [rawNotes, setRawNotes] = useState({});
@@ -557,16 +558,23 @@ const App = () => {
              </div>
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">เลือกสาขา:</span>
-              <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
-                className="bg-slate-100 border-none rounded-lg px-3 py-2 text-xs font-bold text-indigo-700 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500">
-                {Object.entries(BRANCH_NAMES).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
-              </select>
+          <div className="flex flex-wrap items-center gap-4">
+            {/* ปรับแต่งดีไซน์ตัวเลือกสาขาให้โดดเด่นขึ้น */}
+            <div className="flex items-center gap-3 bg-indigo-50 border-2 border-indigo-200 rounded-xl px-4 py-2 shadow-sm hover:border-indigo-300 transition-colors">
+              <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                <MapPin size={18} className="text-indigo-600" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-indigo-400 uppercase leading-none mb-0.5">เลือกสาขาพื้นที่</span>
+                <select value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
+                  className="bg-transparent border-none p-0 text-sm font-black text-indigo-900 outline-none cursor-pointer focus:ring-0 leading-tight">
+                  {Object.entries(BRANCH_NAMES).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+                </select>
+              </div>
             </div>
-            <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-bold text-sm shadow-md" disabled={loading}>
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> {loading ? "โหลด..." : "โหลดข้อมูล"}
+            
+            <button onClick={fetchData} className="flex items-center gap-2 px-5 py-3.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all font-bold text-sm shadow-md" disabled={loading}>
+              <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> {loading ? "กำลังโหลด..." : "อัปเดตข้อมูล"}
             </button>
           </div>
         </header>
@@ -673,7 +681,7 @@ const App = () => {
                         <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-28"><div className="flex items-center gap-1"><Clock size={12}/> วันที่เข้า</div></th>
                         <th className="p-3 font-black text-rose-800 uppercase text-[10px] bg-rose-100/50 w-32"><div className="flex items-center gap-1"><Phone size={12}/> เบอร์โทรศัพท์</div></th>
                         <th className="p-3 font-black text-rose-800 uppercase text-[10px] min-w-[120px]">รายการที่สนใจ</th>
-                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] w-48">📝 บันทึกการติดตาม</th>
+                        <th className="p-3 font-black text-rose-800 uppercase text-[10px] min-w-[300px]">📝 บันทึกการติดตาม</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-rose-100">
