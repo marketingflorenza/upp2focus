@@ -63,6 +63,15 @@ const COLORS = {
   none: '#f43f5e',   // Rose (Alert for pending)
 };
 
+// --- Helper บังคับเวลาประเทศไทย ---
+const getThaiYMD = (date) => {
+  const thaiDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  const y = thaiDate.getFullYear();
+  const m = String(thaiDate.getMonth() + 1).padStart(2, '0');
+  const d = String(thaiDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // --- Custom Robust CSV Parser สำหรับข้อมูลตารางหลัก ---
 const parseCSV = (str) => {
   const arr = [];
@@ -214,7 +223,6 @@ const NoteCell = ({ branchId, rowId, initialNote, airtableRecordId, onNoteSaved 
 };
 
 const App = () => {
-  // เปลี่ยนค่าเริ่มต้นให้เป็นสาขา FRC (Choc)
   const [selectedBranch, setSelectedBranch] = useState('Choc');
   const [rawData, setRawData] = useState([]);
   
@@ -233,9 +241,13 @@ const App = () => {
     }
   };
   
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+  // 🕒 อัปเดต State โดยใช้ Helper getThaiYMD()
+  const [dateRange, setDateRange] = useState(() => {
+    const now = new Date();
+    return {
+      start: getThaiYMD(new Date(now.getFullYear(), now.getMonth(), 1)),
+      end: getThaiYMD(now)
+    };
   });
 
   // --- Logic Helpers ---
@@ -559,7 +571,6 @@ const App = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-4">
-            {/* ปรับแต่งดีไซน์ตัวเลือกสาขาให้โดดเด่นขึ้น */}
             <div className="flex items-center gap-3 bg-indigo-50 border-2 border-indigo-200 rounded-xl px-4 py-2 shadow-sm hover:border-indigo-300 transition-colors">
               <div className="bg-white p-1.5 rounded-lg shadow-sm">
                 <MapPin size={18} className="text-indigo-600" />
@@ -660,7 +671,7 @@ const App = () => {
             </div>
 
             <div className="space-y-6">
-              {/* Pending Table พร้อมช่องบันทึกการติดตาม */}
+              {/* Pending Table */}
               <div className="bg-white rounded-2xl shadow-xl border-2 border-rose-100 overflow-hidden ring-4 ring-rose-50/50">
                 <div className="p-4 border-b border-rose-100 flex justify-between items-center bg-rose-50/30">
                   <h3 className="font-black text-sm uppercase tracking-wider text-rose-700 flex items-center gap-2">
@@ -687,13 +698,14 @@ const App = () => {
                     <tbody className="divide-y divide-rose-100">
                       {filteredPending.map((row, i) => (
                         <tr key={`${row.id}_${i}`} className="hover:bg-rose-50/30 transition-colors">
-                          <td className="p-3 text-slate-500 font-medium">{row.p2Date.toLocaleDateString('th-TH')}</td>
+                          {/* 🕒 เพิ่มพารามิเตอร์ timeZone ลงในจุดที่แสดงผล */}
+                          <td className="p-3 text-slate-500 font-medium">{row.p2Date.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}</td>
                           <td className="p-3">
                             <div className="font-black text-slate-800 text-sm">{row.name}</div>
                           </td>
                           <td className="p-3">
                             <div className="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-100/50 text-rose-700 font-bold text-[10px]">
-                              {row.arrivalDate instanceof Date ? row.arrivalDate.toLocaleDateString('th-TH') : (row.arrivalDate !== '-' ? row.arrivalDate : 'ไม่ระบุ')}
+                              {row.arrivalDate instanceof Date ? row.arrivalDate.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' }) : (row.arrivalDate !== '-' ? row.arrivalDate : 'ไม่ระบุ')}
                             </div>
                           </td>
                           <td className="p-3 bg-rose-50/20">
@@ -703,7 +715,6 @@ const App = () => {
                           </td>
                           <td className="p-3 text-slate-500 italic max-w-[150px] leading-tight break-words whitespace-pre-wrap">{row.interest}</td>
                           <td className="p-3">
-                            {/* ดึง NoteCell ของ Airtable มาใช้ พร้อมส่ง Record ID */}
                             <NoteCell 
                               branchId={selectedBranch} 
                               rowId={row.id} 
@@ -750,7 +761,8 @@ const App = () => {
                           </td>
                           <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
                           <td className="p-4 font-black text-emerald-600 text-sm">฿{row.amt.toLocaleString()}</td>
-                          <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH')}</td>
+                          {/* 🕒 เพิ่มพารามิเตอร์ timeZone */}
+                          <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}</td>
                           <td className="p-4"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
                         </tr>
                       ))}
@@ -786,7 +798,8 @@ const App = () => {
                           <td className="p-4 font-bold text-slate-800">{row.name}</td>
                           <td className="p-4 text-slate-500 italic truncate max-w-[150px]">{row.interest}</td>
                           <td className="p-4 font-black text-indigo-600 text-sm">฿{row.amt.toLocaleString()}</td>
-                          <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH')}</td>
+                          {/* 🕒 เพิ่มพารามิเตอร์ timeZone */}
+                          <td className="p-4 text-slate-400">{row.date.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })}</td>
                           <td className="p-4"><span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-black text-[9px] uppercase">{row.sale}</span></td>
                         </tr>
                       ))}
