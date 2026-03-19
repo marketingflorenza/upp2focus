@@ -44,8 +44,8 @@ const BRANCH_NAMES = {
   'Choc': 'เชียงใหม่ (FRC)',
   'Bangyai': 'บางใหญ่ (FRB)',
   'Sriracha': 'ศรีราชา (FRS)',
-  'Ram': 'รามคำแหง (FRR)',
-  'Bornsong': 'BSK'
+  'Ram': 'รามอินทรา (FRR)',
+  'Bornsong': 'บรอนซอง (BSK)'
 };
 
 // ==========================================
