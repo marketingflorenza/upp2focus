@@ -163,8 +163,18 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // ✅ NEW: State for interest filter in pending table
-  const [interestFilter, setInterestFilter] = useState('');
+  // ✅ Multi-select interest filter
+  const [interestFilters, setInterestFilters] = useState(new Set());
+  const [isInterestOpen, setIsInterestOpen] = useState(false);
+
+  const toggleInterest = (val) => {
+    setInterestFilters(prev => {
+      const next = new Set(prev);
+      next.has(val) ? next.delete(val) : next.add(val);
+      return next;
+    });
+  };
+  const clearInterests = () => setInterestFilters(new Set());
 
   const updateLocalNote = (id, text, recordId) => {
     setRawNotes(prev => ({ ...prev, [id]: text }));
@@ -348,22 +358,20 @@ const App = () => {
     return processed.p1SuccessList.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.sale && s.sale.toLowerCase().includes(searchTerm.toLowerCase())));
   }, [processed, searchTerm]);
 
-  // ✅ UPDATED: Apply both searchTerm AND interestFilter to pending list
+  // ✅ Multi-select interest filter
   const filteredPending = useMemo(() => {
     if (!processed) return [];
     return processed.pendingDetails.filter(s => {
-      const matchesSearch = 
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      const matchesSearch =
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.phone.includes(searchTerm) ||
         (s.sale && s.sale.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (s.note && s.note.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      const matchesInterest = !interestFilter || 
-        (s.interest || '').trim() === interestFilter;
-
+      const matchesInterest = interestFilters.size === 0 ||
+        interestFilters.has((s.interest || '').trim());
       return matchesSearch && matchesInterest;
     });
-  }, [processed, searchTerm, interestFilter]);
+  }, [processed, searchTerm, interestFilters]);
 
   const StatCard = ({ title, value, colorClass, sub, icon: Icon, percent }) => (
     <div className={`bg-white p-5 rounded-2xl border-l-4 ${colorClass} shadow-sm transition-all hover:shadow-md`}>
@@ -482,47 +490,94 @@ const App = () => {
                     </span>
                   </div>
 
-                  {/* ✅ Interest Filter — native select (reliable, no overlay bug) */}
+                  {/* ✅ Multi-select interest filter with checkbox dropdown */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider flex items-center gap-1">
+                    <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
                       <Tag size={11} /> กรองรายการที่สนใจ:
                     </span>
 
-                    <div className="relative flex items-center">
-                      <Filter size={11} className="absolute left-2.5 text-rose-400 pointer-events-none" />
-                      <select
-                        value={interestFilter}
-                        onChange={(e) => setInterestFilter(e.target.value)}
-                        className="pl-7 pr-8 py-1.5 text-[11px] font-bold bg-white border border-rose-200 rounded-lg text-rose-700 outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent cursor-pointer appearance-none shadow-sm hover:border-rose-400 transition-colors"
+                    {/* Dropdown trigger button */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsInterestOpen(o => !o)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black border transition-all ${
+                          isInterestOpen
+                            ? 'bg-rose-600 text-white border-rose-600'
+                            : interestFilters.size > 0
+                              ? 'bg-rose-100 text-rose-700 border-rose-300'
+                              : 'bg-white text-rose-600 border-rose-200 hover:border-rose-400'
+                        }`}
                       >
-                        <option value="">— ทั้งหมด ({processed?.pendingDetails.length || 0} ราย) —</option>
-                        {uniqueInterests.map(interest => {
-                          const count = processed?.pendingDetails.filter(r =>
-                            (r.interest || '').trim() === interest
-                          ).length || 0;
-                          return (
-                            <option key={interest} value={interest}>
-                              {interest} ({count} ราย)
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <ChevronDown size={11} className="absolute right-2 text-rose-400 pointer-events-none" />
+                        <Filter size={11} />
+                        {interestFilters.size > 0 ? `เลือกแล้ว ${interestFilters.size} รายการ` : 'เลือกรายการ'}
+                        <ChevronDown size={11} className={`transition-transform duration-200 ${isInterestOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {/* Checkbox dropdown panel */}
+                      {isInterestOpen && (
+                        <>
+                          {/* Backdrop */}
+                          <div className="fixed inset-0 z-20" onMouseDown={() => setIsInterestOpen(false)} />
+                          <div className="absolute top-full left-0 mt-1.5 z-30 bg-white border border-rose-100 rounded-xl shadow-2xl w-64 overflow-hidden">
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-3 py-2 bg-rose-50 border-b border-rose-100">
+                              <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider">เลือกได้หลายรายการ</span>
+                              {interestFilters.size > 0 && (
+                                <button
+                                  onMouseDown={(e) => { e.stopPropagation(); clearInterests(); }}
+                                  className="text-[9px] font-black text-rose-400 hover:text-rose-600 underline"
+                                >
+                                  ล้างทั้งหมด
+                                </button>
+                              )}
+                            </div>
+                            {/* Scrollable list */}
+                            <div className="max-h-56 overflow-y-auto">
+                              {uniqueInterests.length === 0 ? (
+                                <div className="px-4 py-4 text-[10px] text-slate-400 italic text-center">ไม่มีข้อมูลรายการที่สนใจ</div>
+                              ) : uniqueInterests.map(interest => {
+                                const count = processed?.pendingDetails.filter(r => (r.interest || '').trim() === interest).length || 0;
+                                const checked = interestFilters.has(interest);
+                                return (
+                                  <label
+                                    key={interest}
+                                    className={`flex items-center justify-between gap-2 px-3 py-2.5 cursor-pointer transition-colors ${checked ? 'bg-rose-50' : 'hover:bg-slate-50'}`}
+                                    onMouseDown={(e) => { e.preventDefault(); toggleInterest(interest); }}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition-colors ${checked ? 'bg-rose-600 border-rose-600' : 'border-slate-300'}`}>
+                                        {checked && (
+                                          <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                            <path d="M1 3L3.5 5.5L8 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                          </svg>
+                                        )}
+                                      </div>
+                                      <span className={`text-[11px] font-bold truncate ${checked ? 'text-rose-700' : 'text-slate-600'}`}>{interest}</span>
+                                    </div>
+                                    <span className={`flex-shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full ${checked ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                      {count}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    {/* Active filter badge + clear */}
-                    {interestFilter && (
-                      <div className="flex items-center gap-1 px-2.5 py-1 bg-rose-600 text-white rounded-full text-[10px] font-black shadow-md">
-                        <span>{interestFilter}</span>
+                    {/* Active filter badges — one per selected interest */}
+                    {Array.from(interestFilters).map(f => (
+                      <div key={f} className="flex items-center gap-1 pl-2.5 pr-1 py-1 bg-rose-600 text-white rounded-full text-[10px] font-black shadow-sm max-w-[160px]">
+                        <span className="truncate">{f}</span>
                         <button
-                          onClick={() => setInterestFilter('')}
-                          className="ml-0.5 hover:bg-rose-500 rounded-full p-0.5 transition-colors"
-                          title="ล้างตัวกรอง"
+                          onClick={() => toggleInterest(f)}
+                          className="flex-shrink-0 hover:bg-rose-500 rounded-full p-0.5 ml-0.5 transition-colors"
                         >
                           <X size={10} />
                         </button>
                       </div>
-                    )}
+                    ))}
                   </div>
                 </div>
 
@@ -538,9 +593,9 @@ const App = () => {
                           <div className="flex items-center gap-1">
                             <Tag size={12} />
                             รายการที่สนใจ
-                            {interestFilter && (
+                            {interestFilters.size > 0 && (
                               <span className="ml-1 px-1.5 py-0.5 bg-rose-600 text-white rounded-full text-[8px] font-black">
-                                ✓
+                                {interestFilters.size}
                               </span>
                             )}
                           </div>
@@ -562,7 +617,7 @@ const App = () => {
                             <a href={`tel:${row.phone}`} className="font-mono text-sm font-black text-rose-600 hover:underline flex items-center gap-1">{row.phone}</a>
                           </td>
                           <td className="p-3 text-slate-500 italic max-w-[150px] leading-tight break-words whitespace-pre-wrap">
-                            {interestFilter && (row.interest || '').trim() === interestFilter ? (
+                            {interestFilters.size > 0 && interestFilters.has((row.interest || '').trim()) ? (
                               <span className="bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded text-[10px]">
                                 {row.interest}
                               </span>
@@ -576,10 +631,10 @@ const App = () => {
                       {filteredPending.length === 0 && (
                         <tr>
                           <td colSpan="6" className="p-12 text-center">
-                            {interestFilter ? (
+                            {interestFilters.size > 0 ? (
                               <div className="space-y-2">
-                                <p className="text-slate-400 font-black text-sm">ไม่พบลูกค้าที่สนใจ "{interestFilter}"</p>
-                                <button onClick={() => setInterestFilter('')} className="text-[10px] font-bold text-rose-500 hover:underline">ล้างตัวกรอง</button>
+                                <p className="text-slate-400 font-black text-sm">ไม่พบลูกค้าที่ตรงกับรายการที่เลือก</p>
+                                <button onClick={clearInterests} className="text-[10px] font-bold text-rose-500 hover:underline">ล้างตัวกรอง</button>
                               </div>
                             ) : (
                               <p className="text-emerald-500 font-black text-lg">🎉 เยี่ยมมาก! ไม่มีงานค้างติดตามในช่วงนี้</p>
