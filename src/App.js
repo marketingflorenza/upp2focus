@@ -165,7 +165,6 @@ const App = () => {
 
   // ✅ NEW: State for interest filter in pending table
   const [interestFilter, setInterestFilter] = useState('');
-  const [isInterestDropdownOpen, setIsInterestDropdownOpen] = useState(false);
 
   const updateLocalNote = (id, text, recordId) => {
     setRawNotes(prev => ({ ...prev, [id]: text }));
@@ -328,18 +327,13 @@ const App = () => {
     ].filter(d => d.value > 0);
   }, [processed]);
 
-  // ✅ NEW: Extract unique interest values from ALL pending details (not filtered)
+  // ✅ Extract unique interest values — ใช้ค่าเต็มจากข้อมูลจริง ไม่ split
   const uniqueInterests = useMemo(() => {
     if (!processed) return [];
     const interests = new Set();
     processed.pendingDetails.forEach(row => {
-      if (row.interest && row.interest !== '-') {
-        // Split by comma or newline to handle multi-value interests
-        row.interest.split(/[,\n]/).forEach(item => {
-          const trimmed = item.trim();
-          if (trimmed) interests.add(trimmed);
-        });
-      }
+      const val = (row.interest || '').trim();
+      if (val && val !== '-') interests.add(val);
     });
     return Array.from(interests).sort((a, b) => a.localeCompare(b, 'th'));
   }, [processed]);
@@ -365,7 +359,7 @@ const App = () => {
         (s.note && s.note.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesInterest = !interestFilter || 
-        (s.interest && s.interest.toLowerCase().includes(interestFilter.toLowerCase()));
+        (s.interest || '').trim() === interestFilter;
 
       return matchesSearch && matchesInterest;
     });
@@ -488,18 +482,40 @@ const App = () => {
                     </span>
                   </div>
 
-                  {/* ✅ NEW: Interest Filter Row */}
+                  {/* ✅ Interest Filter — native select (reliable, no overlay bug) */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider flex items-center gap-1">
                       <Tag size={11} /> กรองรายการที่สนใจ:
                     </span>
-                    
-                    {/* Active filter badge */}
+
+                    <div className="relative flex items-center">
+                      <Filter size={11} className="absolute left-2.5 text-rose-400 pointer-events-none" />
+                      <select
+                        value={interestFilter}
+                        onChange={(e) => setInterestFilter(e.target.value)}
+                        className="pl-7 pr-8 py-1.5 text-[11px] font-bold bg-white border border-rose-200 rounded-lg text-rose-700 outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent cursor-pointer appearance-none shadow-sm hover:border-rose-400 transition-colors"
+                      >
+                        <option value="">— ทั้งหมด ({processed?.pendingDetails.length || 0} ราย) —</option>
+                        {uniqueInterests.map(interest => {
+                          const count = processed?.pendingDetails.filter(r =>
+                            (r.interest || '').trim() === interest
+                          ).length || 0;
+                          return (
+                            <option key={interest} value={interest}>
+                              {interest} ({count} ราย)
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <ChevronDown size={11} className="absolute right-2 text-rose-400 pointer-events-none" />
+                    </div>
+
+                    {/* Active filter badge + clear */}
                     {interestFilter && (
                       <div className="flex items-center gap-1 px-2.5 py-1 bg-rose-600 text-white rounded-full text-[10px] font-black shadow-md">
                         <span>{interestFilter}</span>
-                        <button 
-                          onClick={() => setInterestFilter('')} 
+                        <button
+                          onClick={() => setInterestFilter('')}
                           className="ml-0.5 hover:bg-rose-500 rounded-full p-0.5 transition-colors"
                           title="ล้างตัวกรอง"
                         >
@@ -507,86 +523,8 @@ const App = () => {
                         </button>
                       </div>
                     )}
-
-                    {/* Dropdown trigger */}
-                    <div className="relative">
-                      <button
-                        onClick={() => setIsInterestDropdownOpen(prev => !prev)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all ${
-                          isInterestDropdownOpen 
-                            ? 'bg-rose-700 text-white border-rose-700' 
-                            : 'bg-white text-rose-600 border-rose-200 hover:border-rose-400 hover:bg-rose-50'
-                        }`}
-                      >
-                        <Filter size={11} />
-                        {interestFilter ? 'เปลี่ยน' : 'เลือกรายการ'}
-                        <ChevronDown size={11} className={`transition-transform ${isInterestDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {/* Dropdown menu */}
-                      {isInterestDropdownOpen && (
-                        <div className="absolute top-full left-0 mt-1 z-30 bg-white border border-rose-100 rounded-xl shadow-2xl min-w-[200px] max-h-64 overflow-y-auto">
-                          {/* All option */}
-                          <button
-                            onClick={() => { setInterestFilter(''); setIsInterestDropdownOpen(false); }}
-                            className={`w-full text-left px-4 py-2.5 text-[11px] font-bold transition-colors hover:bg-rose-50 ${!interestFilter ? 'bg-rose-50 text-rose-700' : 'text-slate-600'}`}
-                          >
-                            <span className="flex items-center gap-2">
-                              {!interestFilter && <CheckCircle size={11} className="text-rose-600" />}
-                              ทั้งหมด ({processed?.pendingDetails.length || 0} ราย)
-                            </span>
-                          </button>
-                          <div className="border-t border-rose-50" />
-                          {uniqueInterests.length > 0 ? uniqueInterests.map((interest) => {
-                            const count = processed?.pendingDetails.filter(r => 
-                              r.interest && r.interest.toLowerCase().includes(interest.toLowerCase())
-                            ).length || 0;
-                            const isActive = interestFilter === interest;
-                            return (
-                              <button
-                                key={interest}
-                                onClick={() => { setInterestFilter(interest); setIsInterestDropdownOpen(false); }}
-                                className={`w-full text-left px-4 py-2.5 text-[11px] font-bold transition-colors hover:bg-rose-50 ${isActive ? 'bg-rose-50 text-rose-700' : 'text-slate-600'}`}
-                              >
-                                <span className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-2">
-                                    {isActive && <CheckCircle size={11} className="text-rose-600 flex-shrink-0" />}
-                                    <span className="truncate">{interest}</span>
-                                  </span>
-                                  <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-black ${isActive ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                                    {count}
-                                  </span>
-                                </span>
-                              </button>
-                            );
-                          }) : (
-                            <div className="px-4 py-3 text-[10px] text-slate-400 italic">ไม่มีข้อมูลรายการที่สนใจ</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Quick tag chips for top interests (max 4) */}
-                    {uniqueInterests.slice(0, 4).map(interest => (
-                      <button
-                        key={interest}
-                        onClick={() => setInterestFilter(interestFilter === interest ? '' : interest)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-black transition-all border ${
-                          interestFilter === interest 
-                            ? 'bg-rose-600 text-white border-rose-600 shadow-md' 
-                            : 'bg-white text-rose-500 border-rose-200 hover:bg-rose-50 hover:border-rose-400'
-                        }`}
-                      >
-                        {interest}
-                      </button>
-                    ))}
                   </div>
                 </div>
-
-                {/* Click-outside overlay to close dropdown */}
-                {isInterestDropdownOpen && (
-                  <div className="fixed inset-0 z-20" onClick={() => setIsInterestDropdownOpen(false)} />
-                )}
 
                 <div className="overflow-x-auto max-h-[500px]">
                   <table className="w-full text-left text-xs">
@@ -624,8 +562,7 @@ const App = () => {
                             <a href={`tel:${row.phone}`} className="font-mono text-sm font-black text-rose-600 hover:underline flex items-center gap-1">{row.phone}</a>
                           </td>
                           <td className="p-3 text-slate-500 italic max-w-[150px] leading-tight break-words whitespace-pre-wrap">
-                            {/* ✅ Highlight matched interest text */}
-                            {interestFilter && row.interest && row.interest.toLowerCase().includes(interestFilter.toLowerCase()) ? (
+                            {interestFilter && (row.interest || '').trim() === interestFilter ? (
                               <span className="bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded text-[10px]">
                                 {row.interest}
                               </span>
